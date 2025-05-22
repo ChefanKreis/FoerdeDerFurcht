@@ -211,6 +211,77 @@ class Bubble(Projectile):
         # TODO: Aufsteigen und Blase platzen
         pass
 
+class Platform(pygame.sprite.Sprite):
+    def __init__(self, x, y, width, height):
+        super().__init__()
+        self.image = pygame.Surface((width, height))
+        self.image.fill((0, 255, 0))
+        self.rect = self.image.get_rect(topleft=(x, y))
+    
+    #TODO: Plattform-Logik (Bewegung, Kollision)
+
+class PowerUp(pygame.sprite.Sprite):
+    def __init__(self, x, y, sprite):
+        super().__init__()
+        self.image = sprite or pygame.Surface((30, 30))
+        self.image.fill((255, 255, 0))
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.type = random.choice(['health', 'ammo'])
+
+class DoubleEspresso(PowerUp):
+        def __init__(self, x, y):
+            super().__init__(x, y, None)
+            self.image.fill((255, 0, 0))
+            self.type = 'double_espresso'
+
+class CheatsheetScroll(PowerUp):
+        def __init__(self, x, y):
+            super().__init__(x, y, None)
+            self.image.fill((0, 0, 255))
+            self.type = 'cheatsheet_scroll'
+
+class SemesterbreakAura(PowerUp):
+        def __init__(self, x, y):
+            super().__init__(x, y, None)
+            self.image.fill((0, 255, 0))
+            self.type = 'semesterbreak_aura'
+
+class MotivationFishBread(PowerUp):
+        def __init__(self, x, y):
+            super().__init__(x, y, None)
+            self.image.fill((255, 0, 255))
+            self.type = 'motivation_fishbread'
+
+class Collectible(pygame.sprite.Sprite):
+    def __init__(self, x, y, sprite):
+        super().__init__()
+        self.image = sprite or pygame.Surface((20, 20))
+        self.image.fill((255, 0, 255))
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.type = random.choice(['coin', 'gem'])
+
+    def collect(self, player):
+        pass
+
+    def update(self):
+        pass
+
+class Creditpoint(Collectible):
+        def __init__(self, x, y):
+            super().__init__(x, y, None)
+            self.image.fill((255, 215, 0))
+            self.type = 'CP'
+
+class Grade(Collectible):
+        def __init__(self, x, y):
+            super().__init__(x, y, None)
+            self.image.fill((0, 0, 255))
+            self.type = 'grade'
+
+
+    
+        
+
 # TODO: Weitere Klassen: PowerUp, Collectible, Platform
 
 if __name__ == "__main__":
