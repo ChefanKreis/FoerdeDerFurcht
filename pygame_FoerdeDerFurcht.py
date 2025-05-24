@@ -16,6 +16,7 @@ import sys      # Systemfunktionen
 WIDTH = 800       # Breite des Bildschirms in Pixeln
 HEIGHT = 600       # Höhe des Bildschirms in Pixeln
 FPS = 60        # Frames per Second (30 oder 60 FPS sind üblicher Standard)
+GRAVITY = 0.8   # Schwerkraftskonstante
 
 #########################################################################
 # Initialisierung:    pygame wird gestartet
@@ -49,8 +50,8 @@ game_folder = os.path.dirname(__file__)
 
 # Wir binden eine Grafik (Ball) ein
 # convert_alpha lässt eine PNG-Datei transparent erscheinen
-ball = pygame.image.load(os.path.join(game_folder, 'ball.png')).convert_alpha()
-imageRect = ball.get_rect()
+# ball = pygame.image.load(os.path.join(game_folder, 'ball.png')).convert_alpha()
+# imageRect = ball.get_rect()
 
 #########################################################################
 # Klassen: Spielfiguren, Gegner, PowerUps
@@ -59,7 +60,7 @@ imageRect = ball.get_rect()
 class Game:
     def __init__(self):
         pygame.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Klausur Chaos: Die Förde der Furcht")
         self.clock = pygame.time.Clock()
         self.running = True
@@ -79,7 +80,20 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            # TODO: Eingaben (Bewegung, Schießen) hier abfragen
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    self.current_level.player.velocity.x = -5
+                if event.key == pygame.K_RIGHT:
+                    self.current_level.player.velocity.x = 5
+                if event.key == pygame.K_UP:
+                    self.current_level.player.jump()
+                if event.key == pygame.K_SPACE:
+                    self.current_level.player.shoot()
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_LEFT and self.current_level.player.velocity.x < 0:
+                    self.current_level.player.velocity.x = 0
+                if event.key == pygame.K_RIGHT and self.current_level.player.velocity.x > 0:
+                    self.current_level.player.velocity.x = 0
 
     def update(self):
         self.current_level.update()
@@ -103,11 +117,17 @@ class Level:
 
     def load(self):
         # TODO: Layout, Gegner, PowerUps etc. basierend auf Level-Number laden
-        pass
+        # Temporäre Test-Plattformen hinzufügen
+        self.platforms.add(Platform(0, HEIGHT - 50, WIDTH, 50))  # Boden
+        self.platforms.add(Platform(200, HEIGHT - 150, 200, 20))  # Plattform 1
+        self.platforms.add(Platform(500, HEIGHT - 250, 150, 20))  # Plattform 2
 
     def update(self):
-        self.player.update()
+        self.player.update(self.platforms)
         self.enemies.update()
+        for enemy in self.enemies:
+            if hasattr(enemy, 'update') and callable(enemy.update):
+                enemy.update(self.platforms)  # Plattformen an Enemy.update() übergeben
         self.powerups.update()
         self.collectibles.update()
         self.platforms.update()
@@ -128,18 +148,68 @@ class Character(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
         self.velocity = pygame.math.Vector2(0, 0)
         self.health = 100
+        self.on_ground = False  # Variable für Bodenkontakt
 
     def move(self, dx, dy):
         self.rect.x += dx
         self.rect.y += dy
 
     def jump(self):
-        # TODO: Sprunglogik
-        pass
+        # Nur springen, wenn der Charakter auf dem Boden ist
+        if self.on_ground:
+            self.velocity.y = -15  # Sprunggeschwindigkeit
+            self.on_ground = False
 
-    def update(self):
-        # TODO: Gravitation, Kollisionen
-        pass
+    def update(self, platforms=None):
+        # Schwerkraft anwenden
+        self.velocity.y += GRAVITY
+        
+        # Maximale Fallgeschwindigkeit begrenzen
+        if self.velocity.y > 15:
+            self.velocity.y = 15
+        
+        # Horizontale Bewegung
+        self.rect.x += self.velocity.x
+        
+        # Horizontale Kollisionsprüfung mit Plattformen
+        if platforms:
+            for platform in platforms:
+                if self.rect.colliderect(platform.rect):
+                    if self.velocity.x > 0:  # Bewegung nach rechts
+                        self.rect.right = platform.rect.left
+                    elif self.velocity.x < 0:  # Bewegung nach links
+                        self.rect.left = platform.rect.right
+        
+        # Bildschirmgrenzen horizontal prüfen
+        if self.rect.left < 0:
+            self.rect.left = 0
+        elif self.rect.right > WIDTH:
+            self.rect.right = WIDTH
+        
+        # Vertikale Bewegung
+        self.rect.y += self.velocity.y
+        
+        # Vertikale Kollisionsprüfung mit Plattformen
+        self.on_ground = False
+        if platforms:
+            for platform in platforms:
+                if self.rect.colliderect(platform.rect):
+                    if self.velocity.y > 0:  # Charakter fällt nach unten
+                        self.rect.bottom = platform.rect.top
+                        self.velocity.y = 0
+                        self.on_ground = True
+                    elif self.velocity.y < 0:  # Charakter springt nach oben
+                        self.rect.top = platform.rect.bottom
+                        self.velocity.y = 0
+        
+        # Bildschirmgrenzen vertikal prüfen
+        if self.rect.top < 0:
+            self.rect.top = 0
+            self.velocity.y = 0
+        elif self.rect.bottom > HEIGHT:
+            self.rect.bottom = HEIGHT
+            self.velocity.y = 0
+            self.on_ground = True
 
 class Player(Character):
     def __init__(self, x, y, sprite):
@@ -163,8 +233,9 @@ class Player(Character):
                 self.lives -= 1
                 # TODO: Leben verloren verarbeiten
 
-    def update(self):
-        super().update()
+    def update(self, platforms=None):
+        super().update(platforms)
+        # Kollisionen mit Plattformen prüfen (wird vom Level aufgerufen)
         # TODO: Spieler-Eingabe, Zustand prüfen
 
 class Enemy(Character):
@@ -177,8 +248,8 @@ class Enemy(Character):
         # TODO: Angriffsverhalten
         pass
 
-    def update(self):
-        super().update()
+    def update(self, platforms):
+        super().update(platforms)
         # TODO: KI-Verhalten
 
 class Weapon:
@@ -287,58 +358,3 @@ class Grade(Collectible):
 if __name__ == "__main__":
     game = Game()
     game.start()
-
-#########################################################################
-# Game Loop:  Hier ist das Herzstück des Templates
-# Im Game Loop laufen immer 5 Phasen ab:
-# 1. Wait: Die Zeit zwischen 2 Frames wird mit Wartezeit gefüllt
-# 2. Input: Alle (Input-)Events werden verarbeitet (Maus, Tastatur, etc.)
-# 3. Update: Alle Sprites werden aktualisert inkl. Spiellogik
-# 4. Render: Alle Sprites werden auf den Bildschirm gezeichnet
-# 5. Double Buffering: Der Screen wird geswitcht und angezeigt
-#########################################################################
-running = True
-
-while running:
-    #########################################################################
-    # 1. Wait-Phase:
-    # Die pygame-interne Funktion clock.tick(FPS) berechnet die
-    # tatsächliche Zeit zwischen zwei Frames und limitiert diese
-    # auf einen Wert(z. B. 1/60). Diese tatsächliche verbrauchte
-    # Zeit wird dann bei der Aktualisierung des Spiels benötigt,
-    # um dieGeschwindigkeit der Objekte anzupassen.
-
-    dt = clock.tick(FPS) / 1000
-
-    #########################################################################
-    # 2. Input-Phase:
-    # Mit pygame.event.get() leeren wir den Event-Speicher.
-    # Das ist wichtig, sonst läuft dieser voll und das Spiel stürzt ab.
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:   # Windows Close Button?
-            running = False             # dann raus aus dem Game Loop
-
-    #########################################################################
-    # 3. Update-Phase: Hier ist die komplette Game Logik untergebracht.
-    imageRect.topleft = (40,80)
-
-
-    #########################################################################
-    # 4. Render-Phase: Zeichne alles auf den Bildschirm
-
-    # Hintergrund
-    screen.fill((255, 255, 255))    # RGB Weiß
-
-    # Zeichne Objekte an Position auf den Screen
-    screen.blit(ball, imageRect)
-
-    #########################################################################
-    # 5. Double Buffering
-
-    pygame.display.flip()
-
-###########################
-# Spiel verlassen: quit
-
-pygame.quit()
