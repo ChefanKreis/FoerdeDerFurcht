@@ -261,6 +261,52 @@ class Weapon:
         # TODO: Projektil erzeugen
         pass
 
+class MultipleChoiceEnemy(Enemy):
+
+    # Standardgegner
+    # Bewegen sich am Boden hin und her, manchmal mit einem kleinen, unvorhersehbaren Sprung („Zufallsprinzip!“)
+    # Leicht in Blasen zu fangen
+
+    def __init__(self, x, y, sprite):
+        super().__init__(x, y, sprite)
+        self.image = sprite or pygame.Surface((50, 50))
+        
+    def update(self, platforms):
+        super().update(platforms)
+
+    def attack(self):
+        pass #Angriff von MCE
+
+class PythonEnemy(Enemy):
+
+    # Agiler. Können höher springen und sich etwas schneller bewegen. 
+    # Könnten eventuell kurze „Einrückungsfehler“-Projektile verschießen. 
+    # Die Schattenbildung zeigt den Ort der Landung an.
+
+
+    def __init__(self, x, y, sprite):
+        super().__init__(x, y, sprite)
+
+    def update(self, platforms):
+        super().update(platforms)
+
+    def attack(self):   
+        pass #Angriff von PEE
+
+class ProgrammingTaskEnemy(Enemy):
+    # Langsamer, aber robuster. Benötigen eventuell zwei Blasentreffer zum Fangen oder müssen öfter angestoßen werden, um zu platzen. 
+    # Können kleine, nervige „Syntax-Fehler“-Bugs spawnen, die den Spieler kurzzeitig stören (z. B. kurz festhalten).
+
+    def __init__(self, x, y, sprite):
+        super().__init__(x, y, sprite)
+
+    def update(self, platforms):
+        super().update(platforms)
+
+    def attack(self):
+        pass #Angriff von PTE
+    
+
 class Projectile(pygame.sprite.Sprite):
     def __init__(self, x, y, sprite):
         super().__init__()
@@ -281,6 +327,8 @@ class Bubble(Projectile):
     def rise(self):
         # TODO: Aufsteigen und Blase platzen
         pass
+
+
 
 class Platform(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height):
