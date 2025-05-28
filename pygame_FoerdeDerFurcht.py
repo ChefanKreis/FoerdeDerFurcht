@@ -109,7 +109,12 @@ class Level:
         self.number = number
         self.layout = None  # Level-Daten laden
         self.player = Player(100, 400, None)  # Platzhalter für Sprite
+
         self.enemies = pygame.sprite.Group()
+        enemy = MultipleChoiceEnemy(200, 300, None)  # Beispielgegner
+        self.enemies.add(enemy)
+        # Weitere Gegner möglich
+
         self.powerups = pygame.sprite.Group()
         self.collectibles = pygame.sprite.Group()
         self.platforms = pygame.sprite.Group()
@@ -124,7 +129,7 @@ class Level:
 
     def update(self):
         self.player.update(self.platforms)
-        self.enemies.update()
+        #self.enemies.update(self.platform)
         for enemy in self.enemies:
             if hasattr(enemy, 'update') and callable(enemy.update):
                 enemy.update(self.platforms)  # Plattformen an Enemy.update() übergeben
@@ -270,9 +275,27 @@ class MultipleChoiceEnemy(Enemy):
     def __init__(self, x, y, sprite):
         super().__init__(x, y, sprite)
         self.image = sprite or pygame.Surface((50, 50))
+        self.image.fill((255, 0, 0))
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.velocity.x = 1  # Geschwindigkeit Enemy
+        self.on_ground = True  # Standardmäßig auf dem Boden
+        self.direction = random.random() # Zufällige Richtung für den Start
+
+    def move(self):
+        # Bildschirmgrenzen vertikal prüfen
+       if self.rect.left <= 0 or self.rect.right >= WIDTH:
+           self.velocity.x *= -1  # Richtung umkehren, Bildschirmgrenze rechts und links
+
+    #def random_jump(self):
+
+       
+           
+     
+        
         
     def update(self, platforms):
         super().update(platforms)
+        self.move() # Bewegung update
 
     def attack(self):
         pass #Angriff von MCE
