@@ -88,7 +88,7 @@ class Game:
                 if event.key == pygame.K_UP:
                     self.current_level.player.jump()
                 if event.key == pygame.K_SPACE:
-                    self.current_level.player.shoot()
+                    self.current_level.player.shoot(self.current_level.projectiles)
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_LEFT and self.current_level.player.velocity.x < 0:
                     self.current_level.player.velocity.x = 0
@@ -118,6 +118,7 @@ class Level:
         self.powerups = pygame.sprite.Group()
         self.collectibles = pygame.sprite.Group()
         self.platforms = pygame.sprite.Group()
+        self.projectiles = pygame.sprite.Group()  # Gruppe für Projektile/Blasen
         self.load()
 
     def load(self):
@@ -136,6 +137,15 @@ class Level:
         self.powerups.update()
         self.collectibles.update()
         self.platforms.update()
+        self.projectiles.update()  # Projektile aktualisieren
+        
+        # Kollisionserkennung: Projektile mit Gegnern
+        for projectile in self.projectiles:
+            if isinstance(projectile, Bubble):
+                for enemy in self.enemies:
+                    if projectile.rect.colliderect(enemy.rect):
+                        projectile.capture_enemy(enemy)
+                        break
 
     def draw(self, screen):
         # TODO: Alle Sprites zeichnen
@@ -143,6 +153,7 @@ class Level:
         self.collectibles.draw(screen)
         self.powerups.draw(screen)
         self.enemies.draw(screen)
+        self.projectiles.draw(screen)  # Projektile zeichnen
         screen.blit(self.player.image, self.player.rect)
 
 class Character(pygame.sprite.Sprite):
@@ -223,9 +234,9 @@ class Player(Character):
         self.weapon = Weapon(self)
         self.is_invincible = False
 
-    def shoot(self):
-        # TODO: Blase abfeuern
-        pass
+    def shoot(self, projectiles_group):
+        # Waffe abfeuern
+        return self.weapon.fire(projectiles_group)
 
     def collect(self, item):
         # TODO: Sammeln
@@ -240,6 +251,7 @@ class Player(Character):
 
     def update(self, platforms=None):
         super().update(platforms)
+        self.weapon.update()  # Weapon-Cooldown aktualisieren
         # Kollisionen mit Plattformen prüfen (wird vom Level aufgerufen)
         # TODO: Spieler-Eingabe, Zustand prüfen
 
@@ -261,10 +273,32 @@ class Weapon:
     def __init__(self, owner):
         self.owner = owner
         self.cooldown = 0
+        self.max_cooldown = 30  # 30 Frames zwischen Schüssen (bei 60 FPS = 0.5 Sekunden)
 
-    def fire(self):
-        # TODO: Projektil erzeugen
-        pass
+    def fire(self, projectiles_group):
+        if self.cooldown <= 0:
+            # Richtung bestimmen (basierend auf der letzten Bewegung des Spielers)
+            direction = 1  # Standard: nach rechts
+            if self.owner.velocity.x < 0:
+                direction = -1  # nach links
+            elif self.owner.velocity.x == 0:
+                direction = 1  # Standard: nach rechts wenn keine Bewegung
+            
+            # Neue Blase seitlich vom Spieler erzeugen
+            bubble = Bubble(
+                self.owner.rect.centerx + (direction * 30),  # 30 Pixel vor dem Spieler
+                self.owner.rect.centery,  # Auf gleicher Höhe wie der Spieler
+                direction  # Richtung an die Blase übergeben
+            )
+            projectiles_group.add(bubble)
+            self.cooldown = self.max_cooldown
+            return bubble
+        return None
+    
+    def update(self):
+        # Cooldown verringern
+        if self.cooldown > 0:
+            self.cooldown -= 1
 
 class MultipleChoiceEnemy(Enemy):
 
@@ -303,7 +337,7 @@ class MultipleChoiceEnemy(Enemy):
 class PythonEnemy(Enemy):
 
     # Agiler. Können höher springen und sich etwas schneller bewegen. 
-    # Könnten eventuell kurze „Einrückungsfehler“-Projektile verschießen. 
+    # Könnten eventuell kurze "Einrückungsfehler"-Projektile verschießen. 
     # Die Schattenbildung zeigt den Ort der Landung an.
 
 
@@ -318,7 +352,7 @@ class PythonEnemy(Enemy):
 
 class ProgrammingTaskEnemy(Enemy):
     # Langsamer, aber robuster. Benötigen eventuell zwei Blasentreffer zum Fangen oder müssen öfter angestoßen werden, um zu platzen. 
-    # Können kleine, nervige „Syntax-Fehler“-Bugs spawnen, die den Spieler kurzzeitig stören (z. B. kurz festhalten).
+    # Können kleine, nervige "Syntax-Fehler"-Bugs spawnen, die den Spieler kurzzeitig stören (z. B. kurz festhalten).
 
     def __init__(self, x, y, sprite):
         super().__init__(x, y, sprite)
@@ -343,15 +377,49 @@ class Projectile(pygame.sprite.Sprite):
         # TODO: Bildschirmgrenzen prüfen
 
 class Bubble(Projectile):
-    def __init__(self, x, y, captured_enemy=None):
+    def __init__(self, x, y, direction=1, captured_enemy=None):
         super().__init__(x, y, None)
+        self.image = pygame.Surface((20, 20), pygame.SRCALPHA)  # Transparente Oberfläche
+        pygame.draw.circle(self.image, (100, 200, 255, 180), (10, 10), 10, 2)  # Blaue Blase
+        self.rect = self.image.get_rect(center=(x, y))
+        self.velocity = pygame.math.Vector2(direction * 5, 0)  # Horizontale Bewegung (5 Pixel pro Frame)
         self.captured_enemy = captured_enemy
+        self.lifetime = 180  # 3 Sekunden bei 60 FPS (kürzer für horizontale Blasen)
+        
+    def update(self):
+        # Horizontal bewegen
+        self.rect.x += self.velocity.x
+        
+        # Lebensdauer verringern
+        self.lifetime -= 1
+        
+        # Blase entfernen wenn sie außerhalb des Bildschirms oder Lebensdauer abgelaufen
+        if (self.lifetime <= 0 or 
+            self.rect.right < 0 or 
+            self.rect.left > WIDTH):
+            self.kill()  # Blase entfernen
+            if self.captured_enemy:
+                self.release_enemy()
+    
+    def capture_enemy(self, enemy):
+        if not self.captured_enemy:
+            self.captured_enemy = enemy
+            # Gegner unsichtbar machen (in der Blase gefangen)
+            enemy.rect.center = self.rect.center
+            enemy.velocity = pygame.math.Vector2(0, 0)  # Gegner kann sich nicht bewegen
+            # Optional: Gegner aus enemies-Gruppe entfernen
+            enemy.kill()
+    
+    def release_enemy(self):
+        # Gegner wieder freigeben (falls implementiert)
+        if self.captured_enemy:
+            # Hier könnte man den Gegner wieder zur enemies-Gruppe hinzufügen
+            # Oder ihn als "besiegt" markieren
+            pass
 
     def rise(self):
         # TODO: Aufsteigen und Blase platzen
         pass
-
-
 
 class Platform(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height):
