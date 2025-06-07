@@ -6,6 +6,8 @@ import pygame   # die Spiele-Engine
 import random   # Zufallszahlen brauchen wir immer...
 import os       # Das Dateisystem
 import sys      # Systemfunktionen
+import movement_enemies  # Import der Bewegungsstrategien für Gegner
+
 
 #########################################################################
 # Settings:   Hier stehen alle Konstanten Variablen für das Spiel.
@@ -50,7 +52,8 @@ game_folder = os.path.dirname(__file__)
 
 # Wir binden eine Grafik (Ball) ein
 # convert_alpha lässt eine PNG-Datei transparent erscheinen
-# ball = pygame.image.load(os.path.join(game_folder, 'ball.png')).convert_alpha()
+
+# MultipleChoiceEnemy = pygame.image.load(os.path.join(game_folder, 'ball.png')).convert_alpha()
 # imageRect = ball.get_rect()
 
 #########################################################################
@@ -315,21 +318,25 @@ class MultipleChoiceEnemy(Enemy):
         self.on_ground = True  # Standardmäßig auf dem Boden
         self.direction = random.random() # Zufällige Richtung für den Start
 
-    def move(self):
-        # Bildschirmgrenzen vertikal prüfen
-       if self.rect.left <= 0 or self.rect.right >= WIDTH:
-           self.velocity.x *= -1  # Richtung umkehren, Bildschirmgrenze rechts und links
+        self.jump_strategy = movement_enemies.RandomJump(jump_strength=-10, jump_chance=0.2)
+        self.move_strategy = movement_enemies.HorizontalMovement()
 
-    #def random_jump(self):
+    
 
-       
-           
+    """def random_jump(self):
+        # Zufälligen Sprung ausführen
+        if random.random() < 0.8: # 80% Chance für einen Sprung
+            self.velocity.y = -10 # Sprunggeschwindigkeit
+            self.on_ground = False  # Gegner springt """
+      
      
         
         
     def update(self, platforms):
         super().update(platforms)
-        self.move() # Bewegung update
+        self.jump_strategy.move(self, platforms)  # Zufalls-Sprung-Logik anwenden
+        self.move_strategy.move(self, platforms)  # Horizontale Bewegung anwenden
+        
 
     def attack(self):
         pass #Angriff von MCE
