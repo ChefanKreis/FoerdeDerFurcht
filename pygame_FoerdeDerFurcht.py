@@ -66,6 +66,26 @@ class Game:
         self.running = True
         self.current_level = Level(1)
         self.score = 0
+        self.game_over = False
+        self.show_start_screen = True  # Startbildschirm anzeigen
+        # Font für Text-Darstellung
+        self.font = pygame.font.Font(None, 36)
+        self.big_font = pygame.font.Font(None, 72)
+        self.title_font = pygame.font.Font(None, 48)
+        
+        # Startbildschirm laden (falls vorhanden)
+        self.start_screen_image = None
+        # Verschiedene Bildformate versuchen
+        image_files = ["startscreen.png", "startscreen.jpg", "startscreen.jpeg"]
+        for image_file in image_files:
+            try:
+                self.start_screen_image = pygame.image.load(image_file)
+                self.start_screen_image = pygame.transform.scale(self.start_screen_image, (WIDTH, HEIGHT))
+                break
+            except (pygame.error, FileNotFoundError):
+                continue
+        
+        # Fallback wird automatisch in draw_start_screen() verwendet
 
     def start(self):
         while self.running:
@@ -81,28 +101,137 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT:
-                    self.current_level.player.velocity.x = -5
-                if event.key == pygame.K_RIGHT:
-                    self.current_level.player.velocity.x = 5
-                if event.key == pygame.K_UP:
-                    self.current_level.player.jump()
-                if event.key == pygame.K_SPACE:
-                    self.current_level.player.shoot(self.current_level.projectiles)
+                if self.show_start_screen:
+                    # Startbildschirm: Beliebige Taste startet das Spiel
+                    self.show_start_screen = False
+                elif self.game_over:
+                    # Bei Game Over: Neustart mit 'R' Taste
+                    if event.key == pygame.K_r:
+                        self.restart_game()
+                else:
+                    # Normale Spielsteuerung
+                    if event.key == pygame.K_LEFT:
+                        self.current_level.player.velocity.x = -5
+                    if event.key == pygame.K_RIGHT:
+                        self.current_level.player.velocity.x = 5
+                    if event.key == pygame.K_UP:
+                        self.current_level.player.jump()
+                    if event.key == pygame.K_SPACE:
+                        self.current_level.player.shoot(self.current_level.projectiles)
+                    # Debug: Schaden nehmen mit 'X' Taste
+                    if event.key == pygame.K_x:
+                        self.current_level.player.take_damage()
             if event.type == pygame.KEYUP:
-                if event.key == pygame.K_LEFT and self.current_level.player.velocity.x < 0:
-                    self.current_level.player.velocity.x = 0
-                if event.key == pygame.K_RIGHT and self.current_level.player.velocity.x > 0:
-                    self.current_level.player.velocity.x = 0
+                if not self.game_over and not self.show_start_screen:
+                    if event.key == pygame.K_LEFT and self.current_level.player.velocity.x < 0:
+                        self.current_level.player.velocity.x = 0
+                    if event.key == pygame.K_RIGHT and self.current_level.player.velocity.x > 0:
+                        self.current_level.player.velocity.x = 0
 
     def update(self):
-        self.current_level.update()
-        # TODO: Punktestand und Spielzustand aktualisieren
+        if not self.game_over and not self.show_start_screen:
+            self.current_level.update()
+            # Prüfen ob Spieler alle Leben verloren hat
+            if self.current_level.player.lives <= 0:
+                self.game_over = True
 
     def draw(self):
         self.screen.fill((0, 0, 0))  # Hintergrund
-        self.current_level.draw(self.screen)
+        
+        if self.show_start_screen:
+            self.draw_start_screen()
+        elif not self.game_over:
+            self.current_level.draw(self.screen)
+            self.draw_hud()
+        else:
+            self.draw_game_over()
+            
         pygame.display.flip()
+
+    def draw_start_screen(self):
+        if self.start_screen_image:
+            # Nur das Bild anzeigen - kein Text
+            self.screen.blit(self.start_screen_image, (0, 0))
+            
+        else:
+            # Fallback ohne Bild
+            self.screen.fill((20, 30, 50))
+            
+            title_text = self.big_font.render("FÖRDE DER FURCHT", True, (255, 215, 0))
+            title_rect = title_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 100))
+            self.screen.blit(title_text, title_rect)
+            
+            subtitle_text = self.title_font.render("Klausur Chaos", True, (255, 255, 255))
+            subtitle_rect = subtitle_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 50))
+            self.screen.blit(subtitle_text, subtitle_rect)
+            
+            instruction_text = self.font.render("Drücke eine beliebige Taste zum Starten", True, (255, 255, 255))
+            instruction_rect = instruction_text.get_rect(center=(WIDTH//2, HEIGHT - 80))
+            self.screen.blit(instruction_text, instruction_rect)
+
+    def draw_hud(self):
+        # Herzen für Leben zeichnen
+        heart_size = 30
+        heart_margin = 5
+        for i in range(self.current_level.player.lives):
+            heart_x = 10 + i * (heart_size + heart_margin)
+            heart_y = 10
+            self.draw_heart(heart_x, heart_y, heart_size)
+
+    def draw_heart(self, x, y, size):
+        # Einfaches Herz mit pygame.draw zeichnen
+        # Herz aus zwei Kreisen und einem Dreieck
+        heart_color = (255, 0, 0)  # Rot
+        
+        # Zwei obere Kreise
+        circle_radius = size // 4
+        pygame.draw.circle(self.screen, heart_color, (x + circle_radius, y + circle_radius), circle_radius)
+        pygame.draw.circle(self.screen, heart_color, (x + size - circle_radius, y + circle_radius), circle_radius)
+        
+        # Unterer Teil des Herzens (Rechteck + Dreieck)
+        pygame.draw.rect(self.screen, heart_color, (x, y + circle_radius, size, circle_radius))
+        
+        # Dreieck für die Herzspitze
+        points = [
+            (x + size // 2, y + size - 2),  # Spitze unten
+            (x, y + size // 2),             # Links
+            (x + size, y + size // 2)       # Rechts
+        ]
+        pygame.draw.polygon(self.screen, heart_color, points)
+
+    def draw_game_over(self):
+        # Hintergrund abdunkeln
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(128)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+        
+        # "Zwangsexmatrikulation" Text
+        game_over_text = self.big_font.render("ZWANGSEXMATRIKULATION", True, (255, 0, 0))
+        text_rect = game_over_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 50))
+        self.screen.blit(game_over_text, text_rect)
+        
+        # Zusätzliche Informationen
+        subtitle_text = self.font.render("Alle Fehlversuche aufgebraucht!", True, (255, 255, 255))
+        subtitle_rect = subtitle_text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        self.screen.blit(subtitle_text, subtitle_rect)
+        
+        # Neustart-Anweisung
+        restart_text = self.font.render("Drücke 'R' für Neustart", True, (255, 255, 255))
+        restart_rect = restart_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50))
+        self.screen.blit(restart_text, restart_rect)
+        
+        # Finaler Punktestand
+        final_score_text = self.font.render(f"Endpunktestand: {self.score}", True, (255, 255, 0))
+        final_score_rect = final_score_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 100))
+        self.screen.blit(final_score_text, final_score_rect)
+
+    def restart_game(self):
+        # Spiel zurücksetzen
+        self.game_over = False
+        self.score = 0
+        self.current_level = Level(1)
+        self.show_start_screen = True  # Zurück zum Startbildschirm
 
 class Level:
     def __init__(self, number):
@@ -154,7 +283,14 @@ class Level:
         self.powerups.draw(screen)
         self.enemies.draw(screen)
         self.projectiles.draw(screen)  # Projektile zeichnen
-        screen.blit(self.player.image, self.player.rect)
+        
+        # Spieler zeichnen (mit Blinken bei Unverwundbarkeit)
+        if self.player.is_invincible:
+            # Blinken: Nur jede 10 Frames zeichnen
+            if (self.player.invincibility_timer // 5) % 2 == 0:
+                screen.blit(self.player.image, self.player.rect)
+        else:
+            screen.blit(self.player.image, self.player.rect)
 
 class Character(pygame.sprite.Sprite):
     def __init__(self, x, y, sprite):
@@ -233,6 +369,7 @@ class Player(Character):
         self.lives = 3
         self.weapon = Weapon(self)
         self.is_invincible = False
+        self.invincibility_timer = 0  # Timer für Unverwundbarkeit
 
     def shoot(self, projectiles_group):
         # Waffe abfeuern
@@ -242,16 +379,25 @@ class Player(Character):
         # TODO: Sammeln
         pass
 
-    def take_damage(self, amount):
+    def take_damage(self, amount=1):
         if not self.is_invincible:
-            self.health -= amount
-            if self.health <= 0:
-                self.lives -= 1
-                # TODO: Leben verloren verarbeiten
+            self.lives -= 1
+            if self.lives > 0:
+                # Leben verloren, aber noch Leben übrig - kurze Unverwundbarkeit
+                self.is_invincible = True
+                self.invincibility_timer = 120  # 2 Sekunden Unverwundbarkeit bei 60 FPS
+            # Wenn self.lives <= 0, wird das Game Over vom Game-Objekt behandelt
 
     def update(self, platforms=None):
         super().update(platforms)
         self.weapon.update()  # Weapon-Cooldown aktualisieren
+        
+        # Unverwundbarkeits-Timer verwalten
+        if self.invincibility_timer > 0:
+            self.invincibility_timer -= 1
+            if self.invincibility_timer <= 0:
+                self.is_invincible = False
+        
         # Kollisionen mit Plattformen prüfen (wird vom Level aufgerufen)
         # TODO: Spieler-Eingabe, Zustand prüfen
 
