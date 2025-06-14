@@ -9,17 +9,26 @@ USE_SCALED = True # Pygame SCALED für Retro-Pixel-Effekt
 
 # Physik-Einstellungen
 GRAVITY = 0.8     # Schwerkraftskonstante
+MAX_FALL_SPEED = 15  # Maximale Fallgeschwindigkeit
 
 # Spieler-Einstellungen
-PLAYER_LIVES = 3                    # Anzahl Leben
+PLAYER_LIVES = 3                  # Anzahl Leben
 PLAYER_JUMP_STRENGTH = -15          # Sprungkraft (negativ = nach oben)
 PLAYER_SPEED = 5                    # Bewegungsgeschwindigkeit
 PLAYER_INVINCIBILITY_TIME = 120     # Unverwundbarkeit in Frames (2 Sek bei 60 FPS)
 
 # Waffen-Einstellungen
-WEAPON_COOLDOWN = 30               # Frames zwischen Schüssen
-BUBBLE_SPEED = 5                   # Geschwindigkeit der Blasen
-BUBBLE_LIFETIME = 180              # Lebensdauer der Blasen in Frames
+WEAPON_COOLDOWN = 30             # Cooldown zwischen Schüssen (in Frames)
+BUBBLE_SPEED = 7                 # Geschwindigkeit der Blasen (schneller als Player)
+BUBBLE_LIFETIME = 300            # Lebensdauer der Blasen (in Frames)
+BUBBLE_RISE_SPEED = 2            # Geschwindigkeit beim Aufsteigen mit gefangenem Gegner
+BUBBLE_AUTO_RISE_DELAY = 60      # Frames bis automatischer Aufstieg beginnt
+BUBBLE_SPAWN_DISTANCE = 30       # Abstand vom Spieler beim Schießen
+
+# PowerUp-Timer (in Frames bei 60 FPS)
+DOUBLE_ESPRESSO_DURATION = 300   # 5 Sekunden
+CHEATSHEET_DURATION = 180        # 3 Sekunden  
+SEMESTERBREAK_DURATION = 300     # 5 Sekunden
 
 # Enemy-Einstellungen
 ENEMY_SPEED = 2                    # Standard-Geschwindigkeit der Gegner
