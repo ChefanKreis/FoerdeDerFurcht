@@ -10,6 +10,10 @@ class Character(pygame.sprite.Sprite):
         self.velocity = pygame.math.Vector2(0, 0)
         self.health = ENEMY_HEALTH
         self.on_ground = False  # Variable für Bodenkontakt
+        
+        # Level-Grenzen (werden vom Level gesetzt)
+        self.level_width = WIDTH  # Standard-Wert, wird überschrieben
+        self.level_height = HEIGHT
 
     def move(self, dx, dy):
         self.rect.x += dx
@@ -41,11 +45,11 @@ class Character(pygame.sprite.Sprite):
                     elif self.velocity.x < 0:  # Bewegung nach links
                         self.rect.left = platform.rect.right
         
-        # Bildschirmgrenzen horizontal prüfen
+        # Level-Grenzen horizontal prüfen
         if self.rect.left < 0:
             self.rect.left = 0
-        elif self.rect.right > WIDTH:
-            self.rect.right = WIDTH
+        elif self.rect.right > self.level_width:
+            self.rect.right = self.level_width
         
         # Vertikale Bewegung
         self.rect.y += self.velocity.y
@@ -63,11 +67,11 @@ class Character(pygame.sprite.Sprite):
                         self.rect.top = platform.rect.bottom
                         self.velocity.y = 0
         
-        # Bildschirmgrenzen vertikal prüfen
+        # Level-Grenzen vertikal prüfen
         if self.rect.top < 0:
             self.rect.top = 0
             self.velocity.y = 0
-        elif self.rect.bottom > HEIGHT:
-            self.rect.bottom = HEIGHT
+        elif self.rect.bottom > self.level_height:
+            self.rect.bottom = self.level_height
             self.velocity.y = 0
             self.on_ground = True 

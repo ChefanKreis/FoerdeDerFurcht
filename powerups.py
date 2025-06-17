@@ -27,7 +27,7 @@ class DoubleEspresso(PowerUp):
         player.is_speed_boosted = True
         player.current_speed = player.base_speed * 2
         player.score += 20  # Bonus für PowerUp-Nutzung
-        print("☕ Doppelter Espresso! Geschwindigkeit verdoppelt für 5 Sekunden!")
+        print("Doppelter Espresso! Geschwindigkeit verdoppelt für 5 Sekunden!")
 
 class CheatsheetScroll(PowerUp):
     def __init__(self, x, y):
@@ -40,7 +40,7 @@ class CheatsheetScroll(PowerUp):
         player.cheatsheet_timer = CHEATSHEET_DURATION
         player.enemies_frozen = True
         player.score += 30  # Bonus für PowerUp-Nutzung
-        print("📋 Spickzettel-Scroll! Alle Gegner eingefroren für 3 Sekunden!")
+        print("Spickzettel! Alle Gegner eingefroren für 3 Sekunden!")
 
 class SemesterbreakAura(PowerUp):
     def __init__(self, x, y):
@@ -53,7 +53,7 @@ class SemesterbreakAura(PowerUp):
         player.semesterbreak_timer = SEMESTERBREAK_DURATION
         player.has_semesterbreak_aura = True
         player.score += 25  # Bonus für PowerUp-Nutzung
-        print("🌟 Semesterferien-Aura! Unverwundbar für 5 Sekunden!")
+        print("Semesterferien-Aura! Unverwundbar für 5 Sekunden!")
 
 class MotivationFishBread(PowerUp):
     def __init__(self, x, y):
@@ -65,7 +65,7 @@ class MotivationFishBread(PowerUp):
         """Motivations-Fischbrötchen: Extra Leben"""
         player.lives += 1
         player.score += 50  # Bonus-Punkte für Extra-Leben
-        print("🐟 Motivations-Fischbrötchen! +1 Leben!")
+        print("Motivations-Fischbrötchen! +1 Leben!")
 
 class Collectible(pygame.sprite.Sprite):
     def __init__(self, x, y, sprite):
@@ -97,7 +97,7 @@ class Creditpoint(Collectible):
         # Extra Leben bei bestimmten CP-Anzahlen
         if player.credit_points % 50 == 0:  # Alle 50 CP ein Extra-Leben
             player.lives += 1
-            print(f"🎓 {player.credit_points} CP erreicht! Extra Leben erhalten!")
+            print(f"{player.credit_points} CP erreicht! Extra Leben erhalten!")
 
 class Grade(Collectible):
     def __init__(self, x, y):
@@ -109,4 +109,4 @@ class Grade(Collectible):
         """Grade (1,0-Note) sammeln - hohe Punkte und Bonusinhalte"""
         player.grades_collected += 1
         player.score += 100  # Hohe Punkte für versteckte Noten
-        print(f"🏆 Note 1,0 gefunden! ({player.grades_collected} gesammelt) +100 Punkte!") 
+        print(f"Note 1,0 gefunden! ({player.grades_collected} gesammelt) +100 Punkte!") 

@@ -58,7 +58,7 @@ class Player(Character):
     def take_damage(self, amount=1):
         # Semesterferien-Aura macht unverwundbar
         if self.has_semesterbreak_aura:
-            print("🛡️ Schaden abgewehrt durch Semesterferien-Aura!")
+            print("Schaden abgewehrt durch Semesterferien-Aura!")
             return
             
         if not self.is_invincible:
@@ -98,21 +98,21 @@ class Player(Character):
             if self.double_espresso_timer <= 0:
                 self.is_speed_boosted = False
                 self.current_speed = self.base_speed
-                print("☕ Doppelter Espresso-Effekt beendet!")
+                print("Doppelter Espresso-Effekt beendet!")
         
         # Spickzettel-Scroll Timer
         if self.cheatsheet_timer > 0:
             self.cheatsheet_timer -= 1
             if self.cheatsheet_timer <= 0:
                 self.enemies_frozen = False
-                print("📋 Spickzettel-Scroll-Effekt beendet!")
+                print("Spickzettel-Scroll-Effekt beendet!")
         
         # Semesterferien-Aura Timer
         if self.semesterbreak_timer > 0:
             self.semesterbreak_timer -= 1
             if self.semesterbreak_timer <= 0:
                 self.has_semesterbreak_aura = False
-                print("🌟 Semesterferien-Aura beendet!")
+                print("Semesterferien-Aura beendet!")
     
     def get_movement_speed(self):
         """Gibt die aktuelle Bewegungsgeschwindigkeit zurück"""
@@ -132,11 +132,11 @@ class Player(Character):
         """Gibt den Status aller aktiven PowerUps zurück (für HUD)"""
         status = []
         if self.is_speed_boosted:
-            status.append(f"☕ Espresso: {self.double_espresso_timer//60 + 1}s")
+            status.append(f"Espresso: {self.double_espresso_timer//60 + 1}s")
         if self.enemies_frozen:
-            status.append(f"📋 Spickzettel: {self.cheatsheet_timer//60 + 1}s")
+            status.append(f"Spickzettel: {self.cheatsheet_timer//60 + 1}s")
         if self.has_semesterbreak_aura:
-            status.append(f"🌟 Aura: {self.semesterbreak_timer//60 + 1}s")
+            status.append(f"Aura: {self.semesterbreak_timer//60 + 1}s")
         return status
 
     # Kollisionen mit Plattformen prüfen (wird vom Level aufgerufen)

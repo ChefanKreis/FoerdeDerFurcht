@@ -15,6 +15,7 @@ from movement_enemies import MovementStrategy, HorizontalMovement, RandomJump, C
 from weapons import Weapon, Bubble
 from platforms import Platform
 from powerups import *
+from camera import Camera
 
 # Konstanten werden jetzt aus settings.py importiert
 
@@ -244,31 +245,83 @@ class Level:
     def __init__(self, number):
         self.number = number
         self.layout = None  # Level-Daten laden
+        
+        # Level-Größe (größer als der Bildschirm für Scrolling)
+        self.level_width = WIDTH * 3 # 3x so breit wie der Bildschirm
+        self.level_height = HEIGHT
+        
+        # Kamera initialisieren
+        self.camera = Camera(self.level_width, self.level_height)
+        
         self.player = Player(100, 400, None)  # Platzhalter für Sprite
+        
+        # Level-Größe an den Player weitergeben
+        self.player.level_width = self.level_width
+        self.player.level_height = self.level_height
 
         self.enemies = pygame.sprite.Group()
-        enemy = MultipleChoiceEnemy(200, 300, None)  # Beispielgegner
-        self.enemies.add(enemy)
-        # Weitere Gegner möglich
-
         self.powerups = pygame.sprite.Group()
         self.collectibles = pygame.sprite.Group()
         self.platforms = pygame.sprite.Group()
         self.projectiles = pygame.sprite.Group()  # Gruppe für Projektile/Blasen
+        
+        # Hintergrund-Farbe oder -Bild
+        self.background_color = (20, 30, 50)  # Dunkelblau
+        
         self.load()
 
     def load(self):
-        # TODO: Layout, Gegner, PowerUps etc. basierend auf Level-Number laden
-        # Temporäre Test-Plattformen hinzufügen
-        self.platforms.add(Platform(0, HEIGHT - 50, WIDTH, 50))  # Boden
-        self.platforms.add(Platform(200, HEIGHT - 150, 200, 20))  # Plattform 1
-        self.platforms.add(Platform(500, HEIGHT - 250, 150, 20))  # Plattform 2
+        # Erweiterte Level-Generierung für Scrolling
+        # Boden über die gesamte Level-Breite
+        ground_height = 50
+        self.platforms.add(Platform(0, HEIGHT - ground_height, self.level_width, ground_height))
         
-        # Test-PowerUps spawnen
-        self._spawn_test_items()
+        # Plattformen über das Level verteilt
+        platform_data = [
+            # (x, y, width, height)
+            (200, HEIGHT - 150, 200, 20),
+            (500, HEIGHT - 250, 150, 20),
+            (750, HEIGHT - 200, 100, 20),
+            (900, HEIGHT - 300, 200, 20),
+            (1200, HEIGHT - 150, 150, 20),
+            (1400, HEIGHT - 350, 100, 20),
+            (1600, HEIGHT - 200, 200, 20),
+            (1850, HEIGHT - 300, 150, 20),
+            (2100, HEIGHT - 250, 200, 20),
+            (2350, HEIGHT - 150, 150, 20),
+        ]
+        
+        for x, y, width, height in platform_data:
+            self.platforms.add(Platform(x, y, width, height))
+        
+        # Gegner über das Level verteilt
+        enemy_positions = [
+            (300, HEIGHT - 100),
+            (600, HEIGHT - 300),
+            (1000, HEIGHT - 350),
+            (1300, HEIGHT - 100),
+            (1700, HEIGHT - 250),
+            (2000, HEIGHT - 100),
+            (2200, HEIGHT - 300),
+        ]
+        
+        for i, (x, y) in enumerate(enemy_positions):
+            if i % 3 == 0:
+                enemy = MultipleChoiceEnemy(x, y, None)
+            elif i % 3 == 1:
+                enemy = PythonEnemy(x, y, None)
+            else:
+                enemy = ProgrammingTaskEnemy(x, y, None)
+            self.enemies.add(enemy)
+        
+        # PowerUps und Collectibles über das Level verteilt
+        self._spawn_level_items()
 
     def update(self):
         self.player.update(self.platforms)
+        
+        # Kamera dem Spieler folgen lassen
+        self.camera.update(self.player)  # Oder: self.camera.update_with_deadzone(self.player)
         
         # Gegner-Updates (mit Einfrieren-Check)
         for enemy in self.enemies:
@@ -364,32 +417,64 @@ class Level:
         powerup = powerup_class(x, y)
         self.powerups.add(powerup)
     
-    def _spawn_test_items(self):
-        """Spawnt Test-PowerUps und Collectibles für das Demo-Level"""
+    def _spawn_level_items(self):
+        """Spawnt PowerUps und Collectibles über das gesamte Level verteilt"""
         from powerups import (DoubleEspresso, CheatsheetScroll, SemesterbreakAura, 
                              MotivationFishBread, Creditpoint, Grade)
         
-        # PowerUps an verschiedenen Positionen
-        self.powerups.add(DoubleEspresso(300, HEIGHT - 200))        # Auf Plattform 1
-        self.powerups.add(CheatsheetScroll(550, HEIGHT - 300))      # Auf Plattform 2
-        self.powerups.add(SemesterbreakAura(150, HEIGHT - 100))     # Am Boden
-        self.powerups.add(MotivationFishBread(650, HEIGHT - 100))   # Am Boden rechts
+        # PowerUps an verschiedenen Positionen im Level
+        powerup_positions = [
+            (300, HEIGHT - 200, DoubleEspresso),
+            (800, HEIGHT - 250, CheatsheetScroll),
+            (1100, HEIGHT - 350, SemesterbreakAura),
+            (1500, HEIGHT - 400, MotivationFishBread),
+            (1900, HEIGHT - 350, DoubleEspresso),
+            (2300, HEIGHT - 200, CheatsheetScroll),
+        ]
         
-        # Credit Points verteilt
-        for i in range(5):
-            self.collectibles.add(Creditpoint(100 + i*100, HEIGHT - 100))
+        for x, y, powerup_class in powerup_positions:
+            self.powerups.add(powerup_class(x, y))
         
-        # Eine versteckte Grade (1,0-Note)
-        self.collectibles.add(Grade(400, HEIGHT - 180))  # Versteckt auf Plattform
+        # Credit Points über das gesamte Level verteilt
+        for i in range(20):
+            x = 200 + i * 150  # Alle 150 Pixel ein Credit Point
+            y = HEIGHT - 100
+            # Einige in der Luft platzieren
+            if i % 3 == 0:
+                y = HEIGHT - 200
+            self.collectibles.add(Creditpoint(x, y))
+        
+        # Versteckte Grades (1,0-Noten) an besonderen Orten
+        grade_positions = [
+            (400, HEIGHT - 180),
+            (1000, HEIGHT - 400),
+            (1800, HEIGHT - 350),
+            (2400, HEIGHT - 200),
+        ]
+        
+        for x, y in grade_positions:
+            self.collectibles.add(Grade(x, y))
 
     def draw(self, screen):
-        # Alle Sprites zeichnen
-        self.platforms.draw(screen)
-        self.collectibles.draw(screen)
-        self.powerups.draw(screen)
+        # Hintergrund zeichnen
+        screen.fill(self.background_color)
+        
+        # Alle Sprites mit Kamera-Offset zeichnen
+        # Plattformen
+        for platform in self.platforms:
+            screen.blit(platform.image, self.camera.apply(platform))
+        
+        # Collectibles
+        for collectible in self.collectibles:
+            screen.blit(collectible.image, self.camera.apply(collectible))
+        
+        # PowerUps
+        for powerup in self.powerups:
+            screen.blit(powerup.image, self.camera.apply(powerup))
         
         # Gegner zeichnen (mit Einfrieren-Effekt)
         for enemy in self.enemies:
+            enemy_pos = self.camera.apply(enemy)
             if self.player.are_enemies_frozen():
                 # Gefrorene Gegner: Bläulicher Tint
                 frozen_surface = enemy.image.copy()
@@ -397,11 +482,13 @@ class Level:
                 frozen_overlay.fill((100, 150, 255))  # Blauer Tint
                 frozen_overlay.set_alpha(100)
                 frozen_surface.blit(frozen_overlay, (0, 0))
-                screen.blit(frozen_surface, enemy.rect)
+                screen.blit(frozen_surface, enemy_pos)
             else:
-                screen.blit(enemy.image, enemy.rect)
+                screen.blit(enemy.image, enemy_pos)
         
-        self.projectiles.draw(screen)  # Projektile zeichnen
+        # Projektile
+        for projectile in self.projectiles:
+            screen.blit(projectile.image, self.camera.apply(projectile))
         
         # Spieler zeichnen (mit Effekten)
         self._draw_player_with_effects(screen)
@@ -409,6 +496,7 @@ class Level:
     def _draw_player_with_effects(self, screen):
         """Zeichnet den Spieler mit allen aktiven visuellen Effekten"""
         player_surface = self.player.image.copy()
+        player_pos = self.camera.apply(self.player)
         
         # PowerUp-Effekte
         if self.player.is_speed_boosted:
@@ -429,9 +517,9 @@ class Level:
         if self.player.is_invincible:
             # Blinken: Nur jede 10 Frames zeichnen
             if (self.player.invincibility_timer // 5) % 2 == 0:
-                screen.blit(player_surface, self.player.rect)
+                screen.blit(player_surface, player_pos)
         else:
-            screen.blit(player_surface, self.player.rect)
+            screen.blit(player_surface, player_pos)
 
 # Alle Klassen wurden in separate Module ausgelagert:
 # - Character, Player -> player.py
