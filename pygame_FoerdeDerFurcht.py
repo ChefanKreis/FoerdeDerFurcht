@@ -10,7 +10,7 @@ import sys      # Systemfunktionen
 # Importiere ausgelagerte Module
 from settings import (WIDTH, HEIGHT, FPS, USE_SCALED, COLOR_HEART, COLOR_BACKGROUND)
 from player import Player
-from enemies import MultipleChoiceEnemy, PythonEnemy, ProgrammingTaskEnemy
+from enemies import MultipleChoiceEnemy, PythonEnemy, ProgrammingTaskEnemy, Boss
 from movement_enemies import MovementStrategy, HorizontalMovement, RandomJump, ChasePlayer
 from weapons import Weapon, Bubble
 from platforms import Platform
@@ -307,12 +307,21 @@ class Level:
         
         for i, (x, y) in enumerate(enemy_positions):
             if i % 3 == 0:
-                enemy = MultipleChoiceEnemy(x, y, None)
+                enemy = MultipleChoiceEnemy(x, y, None, self.level_width) # Pass level_width
             elif i % 3 == 1:
-                enemy = PythonEnemy(x, y, None)
+                enemy = PythonEnemy(x, y, None, self.level_width) # Pass level_width
             else:
-                enemy = ProgrammingTaskEnemy(x, y, None)
+                enemy = ProgrammingTaskEnemy(x, y, None, self.level_width) # Pass level_width
+            
             self.enemies.add(enemy)
+                
+        ######## Boss am Ende hinzufügen ########
+        boss_x = self.level_width - 300  # Boss am rechten Ende des Levels
+        boss_y = HEIGHT - 200  # Etwas höher als der Boden
+        boss = Boss(boss_x, boss_y, None, self.level_width)  # Pass level_width
+        self.enemies.add(boss)
+            
+            #self.enemies.add(enemy)
         
         # PowerUps und Collectibles über das Level verteilt
         self._spawn_level_items()
@@ -322,6 +331,10 @@ class Level:
         
         # Kamera dem Spieler folgen lassen
         self.camera.update(self.player)  # Oder: self.camera.update_with_deadzone(self.player)
+        
+        for enemy in self.enemies:
+            enemy.update(self.platforms, self.player, self.camera) # Spieler, Kamera übergeben
+            
         
         # Gegner-Updates (mit Einfrieren-Check)
         for enemy in self.enemies:
@@ -334,6 +347,11 @@ class Level:
                     enemy.velocity.x = 0  # Horizontale Bewegung stoppen
                     enemy.rect.y += enemy.velocity.y  # Schwerkraft weiter anwenden
                     enemy.velocity.y += 0.8  # Gravity
+
+        # Kollision Spieler mit Enemies
+        if self.player.rect.colliderect(enemy.rect):
+            if not self.player.is_invincible:
+                self.player.take_damage()
         
         self.powerups.update()
         self.collectibles.update()
@@ -471,6 +489,9 @@ class Level:
         # PowerUps
         for powerup in self.powerups:
             screen.blit(powerup.image, self.camera.apply(powerup))
+
+        for enemy in self.enemies:
+            screen.blit(enemy.image, self.camera.apply(enemy))
         
         # Gegner zeichnen (mit Einfrieren-Effekt)
         for enemy in self.enemies:
