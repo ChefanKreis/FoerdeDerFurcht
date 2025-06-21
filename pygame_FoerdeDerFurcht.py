@@ -33,6 +33,32 @@ clock = pygame.time.Clock()
 # Das Dateisystem ermittelt das aktuelle Verzeichnis
 game_folder = os.path.dirname(__file__)
 
+#########################################################################
+# Spezielle Klasse für den Hauptboden mit ground.png Textur
+#########################################################################
+
+class GroundPlatform(Platform):
+    def __init__(self, x, y, width, height):
+        # Zunächst normale Platform erstellen
+        super().__init__(x, y, width, height)
+        
+        # Versucht ground.png zu laden
+        try:
+            ground_texture = pygame.image.load("images/ground.png").convert_alpha()
+            tex_w, tex_h = ground_texture.get_size()
+            
+            # Neue Surface mit der Textur erstellen
+            self.image = pygame.Surface((width, height), pygame.SRCALPHA)
+            
+            # Textur über die gesamte Breite kacheln
+            for ty in range(0, height, tex_h):
+                for tx in range(0, width, tex_w):
+                    self.image.blit(ground_texture, (tx, ty))
+                    
+        except (pygame.error, FileNotFoundError):
+            # Fallback: Behalte die normale Platform-Darstellung
+            pass
+
 class Game:
     def __init__(self):
         pygame.init()
@@ -48,10 +74,20 @@ class Game:
         self.score = 0
         self.game_over = False
         self.show_start_screen = True  # Startbildschirm anzeigen
+        self.show_main_menu = True     # Hauptmenü anzeigen
+        self.show_options = False      # Optionsmenü anzeigen
+        
         # Font für Text-Darstellung
         self.font = pygame.font.Font(None, 36)
         self.big_font = pygame.font.Font(None, 72)
         self.title_font = pygame.font.Font(None, 48)
+        
+        # Menü-Fonts (Serif-ähnlich, falls verfügbar)
+        try:
+            self.menu_font = pygame.font.Font("assets/fonts/serif.ttf", 32)
+        except (pygame.error, FileNotFoundError):
+            # Fallback auf System-Font
+            self.menu_font = pygame.font.Font(None, 32)
         
         # Startbildschirm laden (falls vorhanden)
         self.start_screen_image = None
@@ -65,6 +101,19 @@ class Game:
             except (pygame.error, FileNotFoundError):
                 continue
         
+        # Menü-Einstellungen (horizontale Animation von rechts)
+        self.menu_animation_offset = 200  # Startet außerhalb des Bildschirms (nach rechts)
+        self.menu_target_offset = 0       # Zielposition
+        self.menu_animation_speed = 12    # Animationsgeschwindigkeit
+        
+        # Menü-Farben (warmes Gold)
+        self.menu_accent_color = (210, 180, 140)  # Warmes Gold
+        self.menu_hover_color = (255, 215, 0)     # Helleres Gold beim Hover
+        self.menu_text_color = (255, 255, 255)    # Weißer Text
+        
+        # Button-Definitionen
+        self.setup_menu_buttons()
+        
         # Fallback wird automatisch in draw_start_screen() verwendet
 
     def start(self):
@@ -76,14 +125,299 @@ class Game:
         pygame.quit()
         sys.exit()
 
+    def setup_menu_buttons(self):
+        """Erstellt die Menü-Buttons mit Positionen und Größen"""
+        # Panel-Einstellungen (vertikal oben rechts)
+        panel_width = 150
+        panel_height = 180
+        panel_x = WIDTH - panel_width - 30  # 30px Abstand vom rechten Rand
+        panel_y = 50  # 50px Abstand vom oberen Rand
+        
+        # Button-Einstellungen (vertikal angeordnet)
+        button_width = 120
+        button_height = 40
+        button_spacing = 15
+        button_start_x = panel_x + (panel_width - button_width) // 2
+        button_start_y = panel_y + 20  # 20px Abstand vom Panel-Rand
+        
+        # Button-Rectangles definieren (vertikal)
+        self.menu_buttons = {
+            "start": pygame.Rect(button_start_x, button_start_y, button_width, button_height),
+            "options": pygame.Rect(button_start_x, button_start_y + button_height + button_spacing, button_width, button_height),
+            "quit": pygame.Rect(button_start_x, button_start_y + 2 * (button_height + button_spacing), button_width, button_height)
+        }
+        
+        # Panel-Rectangle
+        self.menu_panel = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+        
+        # Button-Texte
+        self.button_texts = {
+            "start": "Start",
+            "options": "Optionen", 
+            "quit": "Beenden"
+        }
+
+    def draw_main_menu(self, screen, mouse_pos):
+        """Zeichnet das stilvolle Hauptmenü über dem Startbildschirm"""
+        # Startbildschirm als Hintergrund
+        if self.start_screen_image:
+            screen.blit(self.start_screen_image, (0, 0))
+        else:
+            # Fallback-Hintergrund
+            screen.fill((20, 30, 50))
+            title_text = self.big_font.render("FÖRDE DER FURCHT", True, (255, 215, 0))
+            title_rect = title_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 100))
+            screen.blit(title_text, title_rect)
+        
+        # Menü-Panel mit Animation (horizontal von rechts)
+        animated_panel = self.menu_panel.copy()
+        animated_panel.x += self.menu_animation_offset
+        
+        # Schatten-Effekt für das Panel
+        shadow_offset = 4
+        shadow_surface = pygame.Surface((animated_panel.width, animated_panel.height))
+        shadow_surface.set_alpha(50)
+        shadow_surface.fill((0, 0, 0))
+        screen.blit(shadow_surface, (animated_panel.x + shadow_offset, animated_panel.y + shadow_offset))
+        
+        # Panel mit dunklem Hintergrund
+        panel_surface = pygame.Surface((animated_panel.width, animated_panel.height))
+        panel_surface.fill((25, 25, 30))  # Dunkles Grau wie im Optionsmenü
+        
+        # Goldener Rahmen um das Panel
+        pygame.draw.rect(panel_surface, self.menu_accent_color, 
+                        (0, 0, animated_panel.width, animated_panel.height), 3)
+        
+        screen.blit(panel_surface, (animated_panel.x, animated_panel.y))
+        
+        # Buttons zeichnen
+        for button_name, button_rect in self.menu_buttons.items():
+            # Button-Position mit Animation anpassen (horizontal)
+            animated_button = button_rect.copy()
+            animated_button.x += self.menu_animation_offset
+            
+            # Hover-Erkennung (mit animierter Position)
+            is_hovered = animated_button.collidepoint(mouse_pos)
+            
+            # Button-Hintergrund (harmonischer mit dem Rest)
+            button_color = (45, 45, 50) if not is_hovered else (60, 60, 65)
+            pygame.draw.rect(screen, button_color, animated_button)
+            
+            # Button-Rahmen (dick bei Hover, dünn sonst)
+            border_width = 3 if is_hovered else 2
+            border_color = self.menu_hover_color if is_hovered else self.menu_accent_color
+            pygame.draw.rect(screen, border_color, animated_button, border_width)
+            
+            # Subtiler Glow-Effekt bei Hover
+            if is_hovered:
+                # Innerer Glow
+                inner_rect = animated_button.inflate(-6, -6)
+                pygame.draw.rect(screen, (80, 80, 85), inner_rect, 1)
+            
+            # Button-Text mit kleinem Schatten-Effekt
+            text_color = self.menu_hover_color if is_hovered else self.menu_text_color
+            
+            # Schatten-Text (subtil)
+            shadow_surface = self.menu_font.render(self.button_texts[button_name], True, (0, 0, 0))
+            shadow_rect = shadow_surface.get_rect(center=(animated_button.centerx + 1, animated_button.centery + 1))
+            shadow_surface.set_alpha(100)
+            screen.blit(shadow_surface, shadow_rect)
+            
+            # Haupttext
+            text_surface = self.menu_font.render(self.button_texts[button_name], True, text_color)
+            text_rect = text_surface.get_rect(center=animated_button.center)
+            screen.blit(text_surface, text_rect)
+        
+        # Menü-Animation aktualisieren
+        if self.menu_animation_offset > self.menu_target_offset:
+            self.menu_animation_offset -= self.menu_animation_speed
+            if self.menu_animation_offset < self.menu_target_offset:
+                self.menu_animation_offset = self.menu_target_offset
+
+    def handle_menu_events(self, event):
+        """Behandelt Menü-Event-Handling"""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:  # Linke Maustaste
+                mouse_pos = pygame.mouse.get_pos()
+                
+                # Prüfe jeden Button (mit Animation berücksichtigen)
+                for button_name, button_rect in self.menu_buttons.items():
+                    animated_button = button_rect.copy()
+                    animated_button.x += self.menu_animation_offset
+                    
+                    if animated_button.collidepoint(mouse_pos):
+                        if button_name == "start":
+                            self.start_game()
+                        elif button_name == "options":
+                            self.open_settings()
+                        elif button_name == "quit":
+                            self.running = False
+                        break
+
+    def start_game(self):
+        """Startet das Spiel"""
+        self.show_start_screen = False
+        self.show_main_menu = False
+        # Menü-Animation zurücksetzen für nächstes Mal
+        self.menu_animation_offset = 200
+
+    def open_settings(self):
+        """Öffnet das Optionsmenü"""
+        self.show_options = True
+        self.show_main_menu = False  # Hauptmenü ausblenden
+
+    def draw_options_menu(self, screen, mouse_pos):
+        """Zeichnet das Optionsmenü mit Steuerungsinformationen"""
+        # Startbildschirm als Hintergrund
+        if self.start_screen_image:
+            screen.blit(self.start_screen_image, (0, 0))
+        else:
+            # Fallback-Hintergrund
+            screen.fill((20, 30, 50))
+            title_text = self.big_font.render("FÖRDE DER FURCHT", True, (255, 215, 0))
+            title_rect = title_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 100))
+            screen.blit(title_text, title_rect)
+        
+        # Großes Panel für Optionen
+        panel_width = 500
+        panel_height = 420  # Höhe erhöht, um Platz für den Button zu schaffen
+        panel_x = (WIDTH - panel_width) // 2
+        panel_y = (HEIGHT - panel_height) // 2
+        
+        # Schatten-Effekt
+        shadow_offset = 6
+        shadow_surface = pygame.Surface((panel_width, panel_height))
+        shadow_surface.set_alpha(50)
+        shadow_surface.fill((0, 0, 0))
+        screen.blit(shadow_surface, (panel_x + shadow_offset, panel_y + shadow_offset))
+        
+        # Hauptpanel
+        panel_surface = pygame.Surface((panel_width, panel_height))
+        panel_surface.fill((25, 25, 30))  # Dunkles Grau statt Schwarz
+        
+        # Goldener Rahmen um das Panel
+        pygame.draw.rect(panel_surface, self.menu_accent_color, 
+                        (0, 0, panel_width, panel_height), 3)
+        
+        screen.blit(panel_surface, (panel_x, panel_y))
+        
+        # Titel des Optionsmenüs
+        options_title = self.title_font.render("STEUERUNG", True, self.menu_hover_color)
+        title_rect = options_title.get_rect(center=(WIDTH//2, panel_y + 35))
+        screen.blit(options_title, title_rect)
+        
+        # Dezente Trennlinie unter dem Titel
+        line_y = panel_y + 60
+        line_color = (100, 90, 80)  # Gedämpftere Farbe
+        pygame.draw.line(screen, line_color, 
+                        (panel_x + 80, line_y), (panel_x + panel_width - 80, line_y), 2)
+        
+        # Steuerungsinformationen mit harmonischen Farben
+        controls_sections = [
+            {
+                "title": "BEWEGUNG",
+                "color": self.menu_accent_color,  # Warmes Gold
+                "items": ["Pfeiltasten - Bewegen/Springen"]
+            },
+            {
+                "title": "AKTIONEN",
+                "color": (200, 170, 130),  # Gedämpftes Gold
+                "items": ["LEERTASTE - Blasen schießen", "ESC - Zurück zum Hauptmenü"]
+            },
+            {
+                "title": "SPIELZIEL",
+                "color": (180, 150, 110),  # Noch gedämpfteres Gold
+                "items": ["Fange Gegner mit Blasen und sammle", "Credit Points und Noten (1,0)!"]
+            }
+        ]
+        
+        # Text rendern
+        y_offset = panel_y + 85
+        
+        for section in controls_sections:
+            # Kategorie-Titel
+            category_font = pygame.font.Font(None, 28)
+            category_surface = category_font.render(section["title"], True, section["color"])
+            category_rect = category_surface.get_rect(centerx=WIDTH//2, y=y_offset)
+            screen.blit(category_surface, category_rect)
+            
+            # Kleine Linie unter Kategorie
+            pygame.draw.line(screen, section["color"], 
+                           (category_rect.left, category_rect.bottom + 2),
+                           (category_rect.right, category_rect.bottom + 2), 1)
+            
+            y_offset += 35
+            
+            # Detail-Items
+            detail_font = pygame.font.Font(None, 24)
+            for item in section["items"]:
+                item_surface = detail_font.render(item, True, (200, 200, 200))
+                item_rect = item_surface.get_rect(centerx=WIDTH//2, y=y_offset)
+                screen.blit(item_surface, item_rect)
+                
+                y_offset += 25
+            
+            y_offset += 15  # Extra Abstand zwischen Sektionen
+        
+        # Zurück-Button (weiter unten positioniert)
+        back_button_width = 120
+        back_button_height = 35
+        back_button_x = WIDTH//2 - back_button_width//2
+        back_button_y = panel_y + panel_height - 55  # Mehr Abstand vom Rand
+        
+        self.back_button_rect = pygame.Rect(back_button_x, back_button_y, back_button_width, back_button_height)
+        
+        # Button-Styling
+        is_hovered = self.back_button_rect.collidepoint(mouse_pos)
+        button_color = (45, 45, 50) if not is_hovered else (60, 60, 65)
+        pygame.draw.rect(screen, button_color, self.back_button_rect)
+        
+        # Button-Rahmen
+        border_width = 3 if is_hovered else 2
+        border_color = self.menu_hover_color if is_hovered else self.menu_accent_color
+        pygame.draw.rect(screen, border_color, self.back_button_rect, border_width)
+        
+        # Button-Text
+        text_color = self.menu_hover_color if is_hovered else self.menu_text_color
+        back_text = self.menu_font.render("Zurück", True, text_color)
+        back_text_rect = back_text.get_rect(center=self.back_button_rect.center)
+        screen.blit(back_text, back_text_rect)
+
+    def handle_options_events(self, event):
+        """Behandelt Events im Optionsmenü"""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:  # Linke Maustaste
+                mouse_pos = pygame.mouse.get_pos()
+                
+                if hasattr(self, 'back_button_rect') and self.back_button_rect.collidepoint(mouse_pos):
+                    # Zurück zum Hauptmenü
+                    self.show_options = False
+                    self.show_main_menu = True
+                    self.menu_animation_offset = 200  # Animation zurücksetzen
+        
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                # ESC: Zurück zum Hauptmenü
+                self.show_options = False
+                self.show_main_menu = True
+                self.menu_animation_offset = 200  # Animation zurücksetzen
+
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            if event.type == pygame.KEYDOWN:
+            
+            if self.show_start_screen and self.show_main_menu:
+                # Hauptmenü-Events
+                self.handle_menu_events(event)
+            elif self.show_start_screen and self.show_options:
+                # Optionsmenü-Events
+                self.handle_options_events(event)
+            elif event.type == pygame.KEYDOWN:
                 if self.show_start_screen:
-                    # Startbildschirm: Beliebige Taste startet das Spiel
+                    # Startbildschirm: Beliebige Taste startet das Spiel (Fallback)
                     self.show_start_screen = False
+                    self.show_main_menu = False
                 elif self.game_over:
                     # Bei Game Over: Neustart mit 'R' Taste
                     if event.key == pygame.K_r:
@@ -108,6 +442,11 @@ class Game:
                             self.current_level.player.rect.centerx + 50,
                             self.current_level.player.rect.centery
                         )
+                    # ESC-Taste: Zurück zum Hauptmenü
+                    if event.key == pygame.K_ESCAPE:
+                        self.show_start_screen = True
+                        self.show_main_menu = True
+                        self.menu_animation_offset = 200  # Animation zurücksetzen
             if event.type == pygame.KEYUP:
                 if not self.game_over and not self.show_start_screen:
                     if event.key == pygame.K_LEFT and self.current_level.player.velocity.x < 0:
@@ -128,7 +467,16 @@ class Game:
         self.screen.fill((0, 0, 0))  # Hintergrund
         
         if self.show_start_screen:
-            self.draw_start_screen()
+            if self.show_main_menu:
+                # Hauptmenü mit Mausposition
+                mouse_pos = pygame.mouse.get_pos()
+                self.draw_main_menu(self.screen, mouse_pos)
+            elif self.show_options:
+                # Optionsmenü mit Mausposition
+                mouse_pos = pygame.mouse.get_pos()
+                self.draw_options_menu(self.screen, mouse_pos)
+            else:
+                self.draw_start_screen()
         elif not self.game_over:
             self.current_level.draw(self.screen)
             self.draw_hud()
@@ -239,7 +587,9 @@ class Game:
         self.game_over = False
         self.score = 0
         self.current_level = Level(1)
-        self.show_start_screen = True  # Zurück zum Startbildschirm
+        self.show_start_screen = True  # Zurück zum Hauptmenü
+        self.show_main_menu = True
+        self.menu_animation_offset = 200  # Animation zurücksetzen
 
 class Level:
     def __init__(self, number):
@@ -268,13 +618,38 @@ class Level:
         # Hintergrund-Farbe oder -Bild
         self.background_color = (20, 30, 50)  # Dunkelblau
         
+        # Hintergrundbild für das Level laden (Parallax-Effekt)
+        self.background_image = None
+        self.background_y_position = 0
+        self.parallax_factor = 0.1  # Hintergrund bewegt sich langsamer als die Kamera
+        
+        try:
+            # Hintergrundbild laden
+            self.background_texture = pygame.image.load("images/foerde_background.png").convert()
+            tex_w, tex_h = self.background_texture.get_size()
+            
+            # Hintergrundbild auf Bildschirmhöhe skalieren, aber Seitenverhältnis beibehalten
+            scale_factor = HEIGHT / tex_h
+            self.bg_texture_width = int(tex_w * scale_factor)
+            self.bg_texture_height = HEIGHT
+            
+            # Hintergrundbild skalieren
+            self.background_texture = pygame.transform.scale(self.background_texture, 
+                                                           (self.bg_texture_width, self.bg_texture_height))
+            
+            self.background_y_position = 0
+                     
+        except (pygame.error, FileNotFoundError):
+            print("Hintergrundbild 'foerde_background.png' nicht gefunden. Verwende Fallback-Farbe.")
+            self.background_texture = None
+        
         self.load()
 
     def load(self):
         # Erweiterte Level-Generierung für Scrolling
         # Boden über die gesamte Level-Breite
         ground_height = 50
-        self.platforms.add(Platform(0, HEIGHT - ground_height, self.level_width, ground_height))
+        self.platforms.add(GroundPlatform(0, HEIGHT - ground_height, self.level_width, ground_height))
         
         # Plattformen über das Level verteilt
         platform_data = [
@@ -348,15 +723,18 @@ class Level:
                     enemy.rect.y += enemy.velocity.y  # Schwerkraft weiter anwenden
                     enemy.velocity.y += 0.8  # Gravity
 
-        # Kollision Spieler mit Enemies
-        if self.player.rect.colliderect(enemy.rect):
-            if not self.player.is_invincible:
-                self.player.take_damage()
+            # Kollision Spieler mit diesem Gegner prüfen
+            if self.player.rect.colliderect(enemy.rect):
+                if not self.player.is_invincible:
+                    self.player.take_damage()
         
         self.powerups.update()
         self.collectibles.update()
         self.platforms.update()
-        self.projectiles.update()  # Projektile aktualisieren
+        
+        # Jedes Projektil mit Kamera-Referenz updaten
+        for projectile in self.projectiles:
+            projectile.update(self.camera)
         
         # Erweiterte Bubble-Logik
         self._handle_bubble_mechanics()
@@ -476,6 +854,26 @@ class Level:
     def draw(self, screen):
         # Hintergrund zeichnen
         screen.fill(self.background_color)
+        
+        # Hintergrundbild mit Parallax-Effekt zeichnen
+        if self.background_texture:
+            # Parallax-Offset berechnen (Hintergrund bewegt sich langsamer)
+            parallax_offset = self.camera.camera_rect.x * self.parallax_factor
+            
+            # Startposition für das Kacheln berechnen
+            start_x = int(parallax_offset // self.bg_texture_width) * self.bg_texture_width
+            
+            # Wie viele Tiles brauchen wir, um den Bildschirm zu füllen?
+            tiles_needed = (WIDTH // self.bg_texture_width) + 2  # +2 für Übergang
+            
+            # Tiles horizontal kacheln (vertikal ist nicht mehr nötig, da Bild bereits richtige Höhe hat)
+            for i in range(tiles_needed):
+                tile_x = start_x + (i * self.bg_texture_width)
+                screen_x = tile_x - parallax_offset
+                
+                # Nur zeichnen wenn das Tile sichtbar ist
+                if screen_x + self.bg_texture_width >= 0 and screen_x <= WIDTH:
+                    screen.blit(self.background_texture, (screen_x, 0))
         
         # Alle Sprites mit Kamera-Offset zeichnen
         # Plattformen

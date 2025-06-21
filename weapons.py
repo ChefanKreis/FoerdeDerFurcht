@@ -26,7 +26,8 @@ class Weapon:
             bubble = Bubble(
                 self.owner.rect.centerx + (direction * BUBBLE_SPAWN_DISTANCE),  # Konfigurierbare Distanz
                 self.owner.rect.centery,  # Auf gleicher Höhe wie der Spieler
-                direction  # Richtung an die Blase übergeben
+                direction,  # Richtung an die Blase übergeben
+                level_width=self.owner.level_width  # Level-Breite übergeben
             )
             projectiles_group.add(bubble)
             self.cooldown = self.max_cooldown
@@ -46,15 +47,16 @@ class Projectile(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(x, y))
         self.velocity = pygame.math.Vector2(0, -5)
 
-    def update(self):
+    def update(self, *args, **kwargs):
+        # Die Logik zum Entfernen außerhalb des Bildschirms wird jetzt
+        # von der Bubble-Klasse selbst gehandhabt, da diese die Kamera
+        # berücksichtigen muss.
         self.rect.move_ip(self.velocity)
-        # Bildschirmgrenzen prüfen
-        if (self.rect.right < 0 or self.rect.left > WIDTH or 
-            self.rect.bottom < 0 or self.rect.top > HEIGHT):
-            self.kill()
+        # HINWEIS: Das Entfernen des Projektils außerhalb des Levels
+        # (nicht nur des Bildschirms) wird jetzt in der Bubble-Klasse gemacht.
 
 class Bubble(Projectile):
-    def __init__(self, x, y, direction=1, captured_enemy=None):
+    def __init__(self, x, y, direction=1, captured_enemy=None, level_width=WIDTH):
         super().__init__(x, y, None)
         self.image = pygame.Surface((20, 20), pygame.SRCALPHA)  # Transparente Oberfläche
         pygame.draw.circle(self.image, COLOR_BUBBLE, (10, 10), 10, 2)  # Blaue Blase
@@ -65,8 +67,9 @@ class Bubble(Projectile):
         self.rising = False  # Flag für Aufstieg-Modus
         self.pop_timer = 0   # Timer für Platzen-Animation
         self.is_popping = False  # Flag für Platzen-Zustand
+        self.level_width = level_width
         
-    def update(self):
+    def update(self, camera=None):
         if self.is_popping:
             self._handle_popping()
             return
@@ -85,23 +88,34 @@ class Bubble(Projectile):
         # Lebensdauer verringern
         self.lifetime -= 1
         
-        # Bildschirmgrenzen und Lebensdauer prüfen
-        if self._should_be_removed():
-            self._remove_bubble()
+        # Bildschirmgrenzen und Lebensdauer prüfen und ggf. platzen
+        if self._should_be_removed(camera):
+            self.pop(give_points=False) # Am Rand platzen gibt keine Punkte
     
-    def _should_be_removed(self):
-        """Prüft ob die Blase entfernt werden soll"""
+    def _should_be_removed(self, camera=None):
+        """Prüft, ob die Blase entfernt werden soll (platzt am Bildschirmrand)."""
         # Lebensdauer abgelaufen
         if self.lifetime <= 0:
             return True
         
-        # Horizontale Bildschirmgrenzen (nur wenn nicht steigend)
-        if not self.rising and (self.rect.right < 0 or self.rect.left > WIDTH):
-            return True
+        # Wenn eine Kamera übergeben wird, prüfe gegen den Bildschirmrand
+        if camera:
+            screen_rect = camera.apply(self)
+            
+            # Horizontale Prüfung gegen den Bildschirmrand
+            if not self.rising and (screen_rect.right < 0 or screen_rect.left > WIDTH):
+                return True
+            
+            # Vertikale Prüfung (nur nach oben relevant für aufsteigende Blasen)
+            if screen_rect.bottom < 0:
+                return True
         
-        # Vertikale Bildschirmgrenzen
-        if self.rect.bottom < 0 or self.rect.top > HEIGHT:
-            return True
+        # Fallback auf Level-Grenzen, falls keine Kamera vorhanden ist
+        else:
+            if not self.rising and (self.rect.right < 0 or self.rect.left > self.level_width):
+                return True
+            if self.rect.bottom < 0 or self.rect.top > HEIGHT:
+                return True
             
         return False
     
