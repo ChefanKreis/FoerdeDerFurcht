@@ -603,7 +603,9 @@ class Level:
         # Kamera initialisieren
         self.camera = Camera(self.level_width, self.level_height)
         
-        self.player = Player(100, 400, None)  # Platzhalter für Sprite
+        # Player-Sprites laden
+        player_sprites = self._load_player_sprites()
+        self.player = Player(100, 400, player_sprites)
         
         # Level-Größe an den Player weitergeben
         self.player.level_width = self.level_width
@@ -618,32 +620,59 @@ class Level:
         # Hintergrund-Farbe oder -Bild
         self.background_color = (20, 30, 50)  # Dunkelblau
         
-        # Hintergrundbild für das Level laden (Parallax-Effekt)
-        self.background_image = None
-        self.background_y_position = 0
-        self.parallax_factor = 0.1  # Hintergrund bewegt sich langsamer als die Kamera
+        # Hintergrundbild für das Level laden (vereinfachtes Parallax-System)
+        self.background_texture = None
+        self.parallax_factor = 0.5  # Hintergrund bewegt sich halb so schnell wie die Kamera
         
         try:
             # Hintergrundbild laden
-            self.background_texture = pygame.image.load("images/foerde_background.png").convert()
-            tex_w, tex_h = self.background_texture.get_size()
+            original_bg = pygame.image.load("images/foerde_background.png").convert()
             
-            # Hintergrundbild auf Bildschirmhöhe skalieren, aber Seitenverhältnis beibehalten
-            scale_factor = HEIGHT / tex_h
-            self.bg_texture_width = int(tex_w * scale_factor)
-            self.bg_texture_height = HEIGHT
+            # Hintergrundbild auf Bildschirmhöhe skalieren
+            scale_factor = HEIGHT / original_bg.get_height()
+            scaled_width = int(original_bg.get_width() * scale_factor)
+            self.background_texture = pygame.transform.scale(original_bg, (scaled_width, HEIGHT))
             
-            # Hintergrundbild skalieren
-            self.background_texture = pygame.transform.scale(self.background_texture, 
-                                                           (self.bg_texture_width, self.bg_texture_height))
-            
-            self.background_y_position = 0
+            print(f"Hintergrundbild geladen: {scaled_width}x{HEIGHT}")
                      
-        except (pygame.error, FileNotFoundError):
-            print("Hintergrundbild 'foerde_background.png' nicht gefunden. Verwende Fallback-Farbe.")
+        except (pygame.error, FileNotFoundError) as e:
+            print(f"Hintergrundbild 'foerde_background.png' konnte nicht geladen werden: {e}")
             self.background_texture = None
         
         self.load()
+
+    def _load_player_sprites(self):
+        """Lädt alle Player-Sprites für Animationen"""
+        sprites = {}
+        
+        # Sprite-Definitionen: (key, dateiname, fallback_dateinamen)
+        sprite_definitions = {
+            'idle': ['player.png', 'Player.png', 'player_idle.png'],
+            'jump': ['player_jump.png', 'Player_jump.png', 'player_jumping.png'],
+            'run': ['player_run.png', 'Player_run.png', 'player_running.png']
+        }
+        
+        for sprite_key, filenames in sprite_definitions.items():
+            sprite = None
+            for filename in filenames:
+                image_path = f"images/{filename}"
+                try:
+                    sprite = pygame.image.load(image_path).convert_alpha()
+                    sprite = pygame.transform.scale(sprite, (50, 50))  # Spieler-Größe
+                    print(f"Player-{sprite_key}-Sprite geladen: {image_path}")
+                    break
+                except (pygame.error, FileNotFoundError):
+                    continue
+            
+            if sprite is None:
+                print(f"Player-{sprite_key}-Sprite nicht gefunden, verwende Fallback")
+                # Fallback: Weißes Rechteck
+                sprite = pygame.Surface((50, 50))
+                sprite.fill((255, 255, 255))
+            
+            sprites[sprite_key] = sprite
+        
+        return sprites
 
     def load(self):
         # Erweiterte Level-Generierung für Scrolling
@@ -855,25 +884,24 @@ class Level:
         # Hintergrund zeichnen
         screen.fill(self.background_color)
         
-        # Hintergrundbild mit Parallax-Effekt zeichnen
+        # Hintergrundbild mit vereinfachtem Parallax-Effekt zeichnen
         if self.background_texture:
             # Parallax-Offset berechnen (Hintergrund bewegt sich langsamer)
             parallax_offset = self.camera.camera_rect.x * self.parallax_factor
             
-            # Startposition für das Kacheln berechnen
-            start_x = int(parallax_offset // self.bg_texture_width) * self.bg_texture_width
+            # Hintergrundbreite
+            bg_width = self.background_texture.get_width()
             
-            # Wie viele Tiles brauchen wir, um den Bildschirm zu füllen?
-            tiles_needed = (WIDTH // self.bg_texture_width) + 2  # +2 für Übergang
+            # Wie viele Kopien des Hintergrunds brauchen wir?
+            tiles_needed = (self.level_width // bg_width) + 2
             
-            # Tiles horizontal kacheln (vertikal ist nicht mehr nötig, da Bild bereits richtige Höhe hat)
+            # Hintergrundbild mehrfach nebeneinander zeichnen
             for i in range(tiles_needed):
-                tile_x = start_x + (i * self.bg_texture_width)
-                screen_x = tile_x - parallax_offset
+                bg_x = i * bg_width - parallax_offset
                 
-                # Nur zeichnen wenn das Tile sichtbar ist
-                if screen_x + self.bg_texture_width >= 0 and screen_x <= WIDTH:
-                    screen.blit(self.background_texture, (screen_x, 0))
+                # Nur zeichnen wenn es auf dem Bildschirm sichtbar ist
+                if bg_x + bg_width >= 0 and bg_x <= WIDTH:
+                    screen.blit(self.background_texture, (bg_x, 0))
         
         # Alle Sprites mit Kamera-Offset zeichnen
         # Plattformen
@@ -914,31 +942,54 @@ class Level:
     
     def _draw_player_with_effects(self, screen):
         """Zeichnet den Spieler mit allen aktiven visuellen Effekten"""
-        player_surface = self.player.image.copy()
         player_pos = self.camera.apply(self.player)
         
-        # PowerUp-Effekte
+        # PowerUp-Effekte: Umrandung statt Overlay
+        outline_colors = []
         if self.player.is_speed_boosted:
-            # Geschwindigkeits-Effekt: Gelber Umriss
-            speed_overlay = pygame.Surface(player_surface.get_size())
-            speed_overlay.fill((255, 255, 0))  # Gelb
-            speed_overlay.set_alpha(80)
-            player_surface.blit(speed_overlay, (0, 0))
+            outline_colors.append((255, 255, 0))  # Gelb für Geschwindigkeit
         
         if self.player.has_semesterbreak_aura:
-            # Unverwundbarkeits-Effekt: Grüner Schimmer
-            aura_overlay = pygame.Surface(player_surface.get_size())
-            aura_overlay.fill((0, 255, 0))  # Grün
-            aura_overlay.set_alpha(60)
-            player_surface.blit(aura_overlay, (0, 0))
+            outline_colors.append((0, 255, 0))  # Grün für Unverwundbarkeit
+        
+        # Zeichne Umrandungen falls PowerUps aktiv sind
+        if outline_colors:
+            self._draw_player_outline(screen, player_pos, outline_colors)
         
         # Unverwundbarkeits-Blinken
         if self.player.is_invincible:
             # Blinken: Nur jede 10 Frames zeichnen
             if (self.player.invincibility_timer // 5) % 2 == 0:
-                screen.blit(player_surface, player_pos)
+                screen.blit(self.player.image, player_pos)
         else:
-            screen.blit(player_surface, player_pos)
+            screen.blit(self.player.image, player_pos)
+    
+    def _draw_player_outline(self, screen, player_pos, colors):
+        """Zeichnet eine leuchtende Umrandung um den Player"""
+        player_image = self.player.image
+        
+        # Erstelle eine Maske aus dem Player-Sprite
+        mask = pygame.mask.from_surface(player_image)
+        
+        # Für jede Farbe eine Umrandung zeichnen
+        for i, color in enumerate(colors):
+            # Offset für mehrere Umrandungen
+            offset = i + 1
+            
+            # Zeichne Umrandung in alle 8 Richtungen
+            for dx in [-offset, 0, offset]:
+                for dy in [-offset, 0, offset]:
+                    if dx == 0 and dy == 0:
+                        continue  # Überspringe das Zentrum
+                    
+                    # Position für diese Umrandung
+                    outline_pos = (player_pos[0] + dx, player_pos[1] + dy)
+                    
+                    # Erstelle eine farbige Version der Maske
+                    outline_surface = mask.to_surface(setcolor=color, unsetcolor=(0, 0, 0, 0))
+                    outline_surface.set_alpha(120 - i * 20)  # Mehrere Umrandungen werden schwächer
+                    
+                    screen.blit(outline_surface, outline_pos)
 
 # Alle Klassen wurden in separate Module ausgelagert:
 # - Character, Player -> player.py

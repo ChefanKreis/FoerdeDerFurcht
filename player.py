@@ -4,15 +4,21 @@ from weapons import Weapon
 from settings import PLAYER_LIVES, PLAYER_INVINCIBILITY_TIME, PLAYER_SPEED
 
 class Player(Character):
-    def __init__(self, x, y, sprite):
-        super().__init__(x, y, sprite)
+    def __init__(self, x, y, sprites):
+        # Sprites-Dictionary für Animationen speichern
+        self.sprites = sprites if sprites else {}
+        
+        # Standard-Sprite für Character-Initialisierung verwenden
+        default_sprite = sprites.get('idle') if sprites else None
+        super().__init__(x, y, default_sprite)
+        
+        # Animation-System
+        self.current_animation = 'idle'
+        self.facing_direction = 1  # 1 = rechts, -1 = links
         self.lives = PLAYER_LIVES
         self.weapon = Weapon(self)
         self.is_invincible = False
         self.invincibility_timer = 0  # Timer für Unverwundbarkeit
-        
-        # Richtung für Schießen
-        self.facing_direction = 1  # 1 = rechts, -1 = links
         
         # Score-System
         self.score = 0
@@ -77,6 +83,9 @@ class Player(Character):
             self.facing_direction = -1  # nach links
         # Bei velocity.x == 0 bleibt die letzte Richtung erhalten
         
+        # Animation basierend auf Zustand aktualisieren
+        self._update_animation()
+        
         super().update(platforms)
         self.weapon.update()  # Weapon-Cooldown aktualisieren
         
@@ -88,6 +97,42 @@ class Player(Character):
         
         # PowerUp-Timer verwalten
         self._update_powerup_timers()
+    
+    def _update_animation(self):
+        """Aktualisiert die Player-Animation basierend auf dem aktuellen Zustand"""
+        if not self.sprites:
+            return  # Keine Sprites verfügbar
+        
+        # Animation basierend auf Zustand bestimmen
+        new_animation = 'idle'
+        
+        if not self.on_ground:
+            # Spieler ist in der Luft (springend oder fallend)
+            new_animation = 'jump'
+        elif abs(self.velocity.x) > 0:
+            # Spieler bewegt sich horizontal
+            new_animation = 'run'
+        
+        # Animation nur ändern wenn nötig
+        if new_animation != self.current_animation:
+            self.current_animation = new_animation
+            self._apply_current_sprite()
+    
+    def _apply_current_sprite(self):
+        """Wendet das aktuelle Sprite mit Richtungs-Spiegelung an"""
+        if not self.sprites or self.current_animation not in self.sprites:
+            return
+        
+        # Basis-Sprite holen
+        base_sprite = self.sprites[self.current_animation]
+        
+        # Spiegelung anwenden falls nötig
+        if self.facing_direction == -1:
+            # Nach links: Sprite horizontal spiegeln
+            self.image = pygame.transform.flip(base_sprite, True, False)
+        else:
+            # Nach rechts: Original-Sprite verwenden
+            self.image = base_sprite
     
     def _update_powerup_timers(self):
         """Verwaltet alle PowerUp-Timer (minimale Timer-Logik, PowerUps setzen die Werte)"""

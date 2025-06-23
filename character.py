@@ -5,7 +5,9 @@ class Character(pygame.sprite.Sprite):
     def __init__(self, x, y, sprite):
         super().__init__()
         self.image = sprite or pygame.Surface((50, 50))
-        self.image.fill(COLOR_WHITE)
+        # Nur mit weißer Farbe füllen, wenn kein Sprite vorhanden ist
+        if sprite is None:
+            self.image.fill(COLOR_WHITE)
         self.rect = self.image.get_rect(topleft=(x, y))
         self.velocity = pygame.math.Vector2(0, 0)
         self.health = ENEMY_HEALTH
