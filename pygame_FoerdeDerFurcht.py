@@ -70,6 +70,7 @@ class Game:
         pygame.display.set_caption("Klausur Chaos: Die Förde der Furcht")
         self.clock = pygame.time.Clock()
         self.running = True
+
         self.current_level = Level(1)
         self.score = 0
         self.game_over = False
@@ -113,7 +114,9 @@ class Game:
         
         # Button-Definitionen
         self.setup_menu_buttons()
+
         
+      
         # Fallback wird automatisch in draw_start_screen() verwendet
 
     def start(self):
@@ -595,7 +598,7 @@ class Level:
     def __init__(self, number):
         self.number = number
         self.layout = None  # Level-Daten laden
-        
+
         # Level-Größe (größer als der Bildschirm für Scrolling)
         self.level_width = WIDTH * 3 # 3x so breit wie der Bildschirm
         self.level_height = HEIGHT
@@ -606,6 +609,9 @@ class Level:
         # Player-Sprites laden
         player_sprites = self._load_player_sprites()
         self.player = Player(100, 400, player_sprites)
+
+        # Gegner-Sprites laden
+        self.enemy_sprites = self._load_enemy_sprites()  # Gegner-Sprites laden
         
         # Level-Größe an den Player weitergeben
         self.player.level_width = self.level_width
@@ -616,6 +622,8 @@ class Level:
         self.collectibles = pygame.sprite.Group()
         self.platforms = pygame.sprite.Group()
         self.projectiles = pygame.sprite.Group()  # Gruppe für Projektile/Blasen
+
+        
         
         # Hintergrund-Farbe oder -Bild
         self.background_color = (20, 30, 50)  # Dunkelblau
@@ -673,6 +681,41 @@ class Level:
             sprites[sprite_key] = sprite
         
         return sprites
+    
+      #############Enemys generieren######################
+    def _load_enemy_sprites(self):
+        
+        enemy_sprites = {}
+        
+        # Sprite-Definitionen: (key, dateiname, fallback_dateinamen)
+        sprite_definitions = {
+            'multiple_choice': ['enemy_multiple_choice.png', 'Enemy_multiple_choice.png'],
+            'python': ['enemy_python.png', 'Enemy_python.png'],
+            'programming_task': ['enemy_programming_task.png', 'Enemy_programming_task.png'],
+            'boss': ['enemy_boss.png', 'Boss.png']
+        }
+        
+        for sprite_key, filenames in sprite_definitions.items():
+            sprite = None
+            for filename in filenames:
+                image_path = f"images/{filename}"
+                try:
+                    sprite = pygame.image.load(image_path).convert_alpha()
+                    sprite = pygame.transform.scale(sprite, (50, 50))  # Gegner-Größe
+                    print(f"{sprite_key.capitalize()}-Sprite geladen: {image_path}")
+                    break
+                except (pygame.error, FileNotFoundError):
+                    continue
+            
+            if sprite is None:
+                print(f"{sprite_key.capitalize()}-Sprite nicht gefunden, verwende Fallback")
+                # Fallback: Weißes Rechteck
+                sprite = pygame.Surface((50, 50))
+                sprite.fill((255, 255, 255))
+            
+            enemy_sprites[sprite_key] = sprite
+        
+        return enemy_sprites
 
     def load(self):
         # Erweiterte Level-Generierung für Scrolling
@@ -711,18 +754,18 @@ class Level:
         
         for i, (x, y) in enumerate(enemy_positions):
             if i % 3 == 0:
-                enemy = MultipleChoiceEnemy(x, y, None, self.level_width) # Pass level_width
+                enemy = MultipleChoiceEnemy(x, y, self.enemy_sprites['multiple_choice'], self.level_width) # Pass level_width
             elif i % 3 == 1:
-                enemy = PythonEnemy(x, y, None, self.level_width) # Pass level_width
+                enemy = PythonEnemy(x, y, self.enemy_sprites['python'], self.level_width) # Pass level_width
             else:
-                enemy = ProgrammingTaskEnemy(x, y, None, self.level_width) # Pass level_width
+                enemy = ProgrammingTaskEnemy(x, y, self.enemy_sprites['programming_task'], self.level_width) # Pass level_width
             
             self.enemies.add(enemy)
                 
         ######## Boss am Ende hinzufügen ########
         boss_x = self.level_width - 300  # Boss am rechten Ende des Levels
         boss_y = HEIGHT - 200  # Etwas höher als der Boden
-        boss = Boss(boss_x, boss_y, None, self.level_width)  # Pass level_width
+        boss = Boss(boss_x, boss_y, self.enemy_sprites['boss'], self.level_width)  # Pass level_width
         self.enemies.add(boss)
             
             #self.enemies.add(enemy)

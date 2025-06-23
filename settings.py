@@ -31,7 +31,7 @@ CHEATSHEET_DURATION = 180        # 3 Sekunden
 SEMESTERBREAK_DURATION = 300     # 5 Sekunden
 
 # Enemy-Einstellungen
-ENEMY_SPEED = 2                    # Standard-Geschwindigkeit der Gegner
+ENEMY_SPEED = 1                    # Standard-Geschwindigkeit der Gegner
 ENEMY_HEALTH = 100                 # Standard-Gesundheit
 
 # Farben (RGB-Werte)

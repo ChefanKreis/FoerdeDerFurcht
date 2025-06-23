@@ -12,6 +12,17 @@ class Enemy(Character):
         self.state = '''idle'''
         self.movement_strategy = None #Bewegungsstrategie zuweisen
 
+        self.base_image = sprite.copy() if sprite else pygame.Surface((50, 50))
+        if sprite is None:
+            self.base_image.fill(COLOR_WHITE)
+
+        self.image = self.base_image
+
+        if not hasattr(self, 'direction'):
+            self.direction = 1
+        
+
+
     def attack(self):
         # TODO: Angriffsverhalten
         pass
@@ -20,6 +31,21 @@ class Enemy(Character):
 
         if self.movement_strategy:
             self.movement_strategy.move(self, platforms, player, camera)
+
+        if self.velocity.x > 0 and self.direction == -1: # Moving right, but facing left
+            self.image = pygame.transform.flip(self.base_image, True, False) # Flip to face right
+            self.direction = 1 # Update direction to right
+        elif self.velocity.x < 0 and self.direction == 1: # Moving left, but facing right
+            self.image = pygame.transform.flip(self.base_image, True, False) # Flip to face left
+            self.direction = -1 # Update direction to left
+        elif self.velocity.x == 0: # If stationary, maintain current orientation
+            if self.direction == -1:
+                self.image = pygame.transform.flip(self.base_image, True, False)
+            else:
+                self.image = self.base_image
+        else: # If moving, and already facing correct direction
+            self.image = self.base_image if self.direction == 1 else pygame.transform.flip(self.base_image, True, False)
+
 
         super().update(platforms)
 
@@ -33,11 +59,11 @@ class MultipleChoiceEnemy(Enemy):
 
     def __init__(self, x, y, sprite, level_width):
         super().__init__(x, y, sprite, level_width)
-        self.image = sprite or pygame.Surface((50, 50))
-        self.image.fill((255, 0, 0)) #ROT
-        self.rect = self.image.get_rect(topleft=(x, y))
-        self.velocity.x = 0.75  # Geschwindigkeit Enemy
-        self.on_ground = True  # Standardmäßig auf dem Boden
+        #self.image = sprite or pygame.Surface((50, 50))
+        #self.image.fill((255, 0, 0)) #ROT
+        #self.rect = self.image.get_rect(topleft=(x, y))
+        #self.velocity.x = 0.75  # Geschwindigkeit Enemy
+        #self.on_ground = True  # Standardmäßig auf dem Boden
 
         self.movement_strategy = CombinedHorizontalandJump(
             HorizontalMovement(speed=self.speed, left_x_world=0, right_x_world=level_width),
@@ -66,11 +92,11 @@ class PythonEnemy(Enemy):
 
     def __init__(self, x, y, sprite, level_width):
         super().__init__(x, y, sprite, level_width)
-        self.image = sprite or pygame.Surface((50, 50))
-        self.image.fill((COLOR_YELLOW)) #GELB
-        self.rect = self.image.get_rect(topleft=(x, y))
-        self.velocity.x = 1  # Geschwindigkeit Enemy
-        self.on_ground = True  # Standardmäßig auf dem Boden
+        #self.image = sprite or pygame.Surface((50, 50))
+        #self.image.fill((COLOR_YELLOW)) #GELB
+        #self.rect = self.image.get_rect(topleft=(x, y))
+        #self.velocity.x = 1  # Geschwindigkeit Enemy
+        #self.on_ground = True  # Standardmäßig auf dem Boden
     
         self.movement_strategy = CombinedHorizontalandJump(
             HorizontalMovement(speed=self.speed, left_x_world=0, right_x_world=level_width),
@@ -87,11 +113,11 @@ class ProgrammingTaskEnemy(Enemy):
 
     def __init__(self, x, y, sprite, level_width):
         super().__init__(x, y, sprite, level_width)
-        self.image = sprite or pygame.Surface((50, 50))
-        self.image.fill((COLOR_BLUE)) #BLAU
-        self.rect = self.image.get_rect(topleft=(x, y))
-        self.velocity.x = 1  # Geschwindigkeit Enemy
-        self.on_ground = True  # Standardmäßig auf dem Boden
+        #self.image = sprite or pygame.Surface((50, 50))
+        #self.image.fill((COLOR_BLUE)) #BLAU
+        #self.rect = self.image.get_rect(topleft=(x, y))
+        #elf.velocity.x = 1  # Geschwindigkeit Enemy
+        #self.on_ground = True  # Standardmäßig auf dem Boden
 
         self.movement_strategy = HorizontalMovement(speed=self.speed, left_x_world=0, right_x_world=level_width)
 
@@ -99,16 +125,18 @@ class ProgrammingTaskEnemy(Enemy):
         pass #Angriff von PTE 
 
 
+
 class Boss(Enemy):
     def __init__(self, x, y, sprite, level_width):
         super().__init__(x, y, sprite,level_width)
-        self.image = sprite or pygame.Surface((75, 75))
-        self.image.fill((COLOR_BLACK)) #BLACK
-        self.rect = self.image.get_rect(topleft=(x, y))
+        #self.image = sprite or pygame.Surface((75, 75))
+        #self.image.fill((COLOR_BLACK)) #BLACK
+        #self.rect = self.image.get_rect(topleft=(x, y))
         self.movement_strategy = ChasePlayer(speed = self.speed *0.75)
 
-    def update(self, platforms, player = None, camera = None):
-        super().update(platforms, player, camera)
+    #def update(self, platforms, player = None, camera = None):
+        #super().update(platforms, player, camera)
         
     def attack(self):
         return super().attack()
+    
