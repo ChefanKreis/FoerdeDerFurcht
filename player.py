@@ -209,5 +209,4 @@ class Player(Character):
             status.append(f"Aura: {self.semesterbreak_timer//60 + 1}s")
         return status
 
-    # Kollisionen mit Plattformen prüfen (wird vom Level aufgerufen)
-    # TODO: Spieler-Eingabe, Zustand prüfen 
+    # Kollisionen mit Plattformen prüfen (wird vom Level aufgerufen) 

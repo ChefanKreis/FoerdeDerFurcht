@@ -194,7 +194,6 @@ class Bubble(Projectile):
             
             # Punkte geben falls Gegner gefangen war
             if self.captured_enemy and give_points:
-                # TODO: Hier könnte Score-System implementiert werden
                 print(f"Gegner besiegt! +100 Punkte")  # Debug-Output
                 
             # Gefangenen Gegner "besiegen"
@@ -223,7 +222,6 @@ class Bubble(Projectile):
         """Gibt gefangenen Gegner wieder frei (bei vorzeitigem Platzen ohne Besiegen)"""
         if self.captured_enemy and not self.is_popping:
             # Gegner wieder in die Spielwelt setzen
-            # TODO: Hier könnte man den Gegner wieder zur enemies-Gruppe hinzufügen
             # Für jetzt wird der Gegner einfach "besiegt"
             self.captured_enemy.kill()
             self.captured_enemy = None 
