@@ -9,7 +9,7 @@ import sys      # Systemfunktionen
 
 # Importiere ausgelagerte Module
 from settings import (WIDTH, HEIGHT, FPS, USE_SCALED, COLOR_HEART, COLOR_BACKGROUND)
-from settings import ANZAHL_ENEMYS_MAX, ANZAHL_ENEMYS_MIN,ENEMY_SPAWN_AREA_MIN, BOSS_HEALTH
+from settings import ANZAHL_ENEMYS_MAX, ANZAHL_ENEMYS_MIN,ENEMY_SPAWN_AREA_MIN, BOSS_HEALTH, BOSS_SHOOTING_RADIUS
 from player import Player
 from enemies import MultipleChoiceEnemy, PythonEnemy, ProgrammingTaskEnemy, Boss
 from movement_enemies import MovementStrategy, HorizontalMovement, RandomJump, ChasePlayer
@@ -576,33 +576,37 @@ class Game:
 
         
         if boss:
+            player = self.current_level.player
+            distance_to_player = abs(boss.rect.centerx-player.rect.centerx)
+
+            if distance_to_player <= BOSS_SHOOTING_RADIUS:
             # Einstellungen für die Lebensleiste
-            bar_width = 250
-            bar_height = 15
-            bar_x = (WIDTH - bar_width) // 2  # Zentriert am oberen Rand
-            bar_y = 20
+                bar_width = 250
+                bar_height = 15
+                bar_x = (WIDTH - bar_width) // 2  # Zentriert am oberen Rand
+                bar_y = 20
 
             # Berechne den prozentualen Anteil der verbleibenden Lebenspunkte
-            health_percentage = boss.health / BOSS_HEALTH
-            current_health_width = bar_width * health_percentage
+                health_percentage = boss.health / BOSS_HEALTH
+                current_health_width = bar_width * health_percentage
 
             # Hintergrund der Lebensleiste (dunkelrot)
-            background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
-            pygame.draw.rect(self.screen, (139, 0, 0), background_rect)
+                background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+                pygame.draw.rect(self.screen, (139, 0, 0), background_rect)
 
             # Vordergrund der Lebensleiste (hellrot)
             # schrumpfende Gesundheit
-            if current_health_width > 0:
-                health_rect = pygame.Rect(bar_x, bar_y, current_health_width, bar_height)
-                pygame.draw.rect(self.screen, (255, 69, 0), health_rect)
+                if current_health_width > 0:
+                    health_rect = pygame.Rect(bar_x, bar_y, current_health_width, bar_height)
+                    pygame.draw.rect(self.screen, (255, 69, 0), health_rect)
 
             # Schwarzer Rahmen
-            pygame.draw.rect(self.screen, (0, 0, 0), background_rect, 3)
+                pygame.draw.rect(self.screen, (0, 0, 0), background_rect, 3)
 
             # Name des Bosses über der Leiste anzeigen
-            boss_name_text = self.font.render("Prof. Dr. Krauss", True, (255, 255, 255))
-            text_rect = boss_name_text.get_rect(center=(WIDTH // 2, bar_y + bar_height + 15))
-            self.screen.blit(boss_name_text, text_rect)
+                boss_name_text = self.font.render("Prof. Dr. Krauss", True, (255, 255, 255))
+                text_rect = boss_name_text.get_rect(center=(WIDTH // 2, bar_y + bar_height + 15))
+                self.screen.blit(boss_name_text, text_rect)
 
     def draw_heart(self, x, y, size):
         # Einfaches Herz mit pygame.draw zeichnen
@@ -1249,14 +1253,15 @@ class Level:
                                 # Credit Points spawnen wenn Gegner gefangen wird
                                 self._spawn_creditpoint(enemy.rect.centerx, enemy.rect.centery)
                             break
+
         #Kollisionserkennung Spieler Boss RedPen
         projectiles_hitting_player = pygame.sprite.spritecollide(self.player, self.projectiles, False)
         
         if projectiles_hitting_player:
-            for projectile in projectiles_hitting_player:
+            for projectile in projectiles_hitting_player: #Spieler und Redpen
                 if isinstance(projectile, RedPen):
                     self.player.take_damage()
-                    projectile.kill()
+                    projectile.kill() #Projectile verschwindet
                     break
 
         # Sammel-Kollisionen
@@ -1602,10 +1607,10 @@ class Level:
             screen.blit(self.player.image, player_pos)
 
         #Betäubung
-        if self.player.is_stunned:
-            stun_overlay = pygame.Surface(self.player.rect.size, pygame.SRCALPHA)
+        if self.player.is_stunned: 
+            stun_overlay = pygame.Surface(self.player.rect.size, pygame.SRCALPHA) #Bild überlappen
 
-            stun_overlay.fill((255,0,0,80))
+            stun_overlay.fill((0,0,150,80)) #Überlappung transparent blau
             screen.blit(stun_overlay, player_pos)
 
     
