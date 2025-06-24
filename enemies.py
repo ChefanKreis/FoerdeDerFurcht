@@ -25,7 +25,6 @@ class Enemy(Character):
 
 
     def attack(self):
-        # TODO: Angriffsverhalten
         pass
 
     def update(self, platforms, player = None, camera = None):
@@ -41,9 +40,6 @@ class Enemy(Character):
         
 
         super().update(platforms)
-
-        
-        # TODO: KI-Verhalten
 
 class MultipleChoiceEnemy(Enemy):
     # Standardgegner
