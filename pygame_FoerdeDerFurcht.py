@@ -94,15 +94,26 @@ class Game:
         
         # Startbildschirm laden (falls vorhanden)
         self.start_screen_image = None
-        # Verschiedene Bildformate versuchen
-        image_files = ["startscreen.png", "startscreen.jpg", "startscreen.jpeg"]
+        # Verschiedene Bildformate und Pfade versuchen
+        image_files = ["images/startscreen.png", "startscreen.png", "images/startscreen.jpg", "startscreen.jpg", "images/startscreen.jpeg", "startscreen.jpeg"]
         for image_file in image_files:
             try:
                 self.start_screen_image = pygame.image.load(image_file)
                 self.start_screen_image = pygame.transform.scale(self.start_screen_image, (WIDTH, HEIGHT))
+                print(f"Startbildschirm geladen: {image_file}")
                 break
             except (pygame.error, FileNotFoundError):
                 continue
+        
+        # Game Over-Bildschirm laden (falls vorhanden)
+        self.game_over_image = None
+        try:
+            self.game_over_image = pygame.image.load("images/game_over.png")
+            self.game_over_image = pygame.transform.scale(self.game_over_image, (WIDTH, HEIGHT))
+            print("Game Over-Hintergrundbild geladen: game_over.png")
+        except (pygame.error, FileNotFoundError):
+            print("Game Over-Hintergrundbild 'game_over.png' nicht gefunden, verwende Fallback")
+            self.game_over_image = None
         
         # Menü-Einstellungen (horizontale Animation von rechts)
         self.menu_animation_offset = 200  # Startet außerhalb des Bildschirms (nach rechts)
@@ -630,30 +641,74 @@ class Game:
         pygame.draw.polygon(self.screen, heart_color, points)
 
     def draw_game_over(self):
-        # Hintergrund abdunkeln
-        overlay = pygame.Surface((WIDTH, HEIGHT))
-        overlay.set_alpha(128)
-        overlay.fill((0, 0, 0))
-        self.screen.blit(overlay, (0, 0))
+        # Game Over-Hintergrund zeichnen
+        if self.game_over_image:
+            # Game Over-Bild als Hintergrund verwenden
+            self.screen.blit(self.game_over_image, (0, 0))
+            
+            # Leichte Abdunkelung für bessere Textlesbarkeit
+            overlay = pygame.Surface((WIDTH, HEIGHT))
+            overlay.set_alpha(80)  # Weniger stark abdunkeln da Bild schon dunkel sein könnte
+            overlay.fill((0, 0, 0))
+            self.screen.blit(overlay, (0, 0))
+        else:
+            # Fallback: Dunkler Hintergrund ohne Bild
+            overlay = pygame.Surface((WIDTH, HEIGHT))
+            overlay.set_alpha(180)
+            overlay.fill((0, 0, 0))
+            self.screen.blit(overlay, (0, 0))
         
-        # "Zwangsexmatrikulation" Text
+        # Panel für bessere Textlesbarkeit
+        panel_width = 700
+        panel_height = 300
+        panel_x = (WIDTH - panel_width) // 2
+        panel_y = (HEIGHT - panel_height) // 2
+        
+        # Halbtransparentes Panel
+        panel_surface = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
+        panel_surface.fill((0, 0, 0, 120))  # Schwarzer transparenter Hintergrund
+        
+        # Roter Rahmen für dramatischen Effekt
+        pygame.draw.rect(panel_surface, (255, 0, 0), 
+                        (0, 0, panel_width, panel_height), 4)
+        
+        self.screen.blit(panel_surface, (panel_x, panel_y))
+        
+        # "Zwangsexmatrikulation" Text mit Schatten
+        shadow_offset = 3
+        game_over_shadow = self.big_font.render("ZWANGSEXMATRIKULATION", True, (0, 0, 0))
+        shadow_rect = game_over_shadow.get_rect(center=(WIDTH//2 + shadow_offset, panel_y + 70 + shadow_offset))
+        self.screen.blit(game_over_shadow, shadow_rect)
+        
         game_over_text = self.big_font.render("ZWANGSEXMATRIKULATION", True, (255, 0, 0))
-        text_rect = game_over_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 50))
+        text_rect = game_over_text.get_rect(center=(WIDTH//2, panel_y + 70))
         self.screen.blit(game_over_text, text_rect)
         
-        # Zusätzliche Informationen
+        # Zusätzliche Informationen mit Schatten
+        subtitle_shadow = self.font.render("Alle Fehlversuche aufgebraucht!", True, (0, 0, 0))
+        subtitle_shadow_rect = subtitle_shadow.get_rect(center=(WIDTH//2 + 2, panel_y + 120 + 2))
+        self.screen.blit(subtitle_shadow, subtitle_shadow_rect)
+        
         subtitle_text = self.font.render("Alle Fehlversuche aufgebraucht!", True, (255, 255, 255))
-        subtitle_rect = subtitle_text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        subtitle_rect = subtitle_text.get_rect(center=(WIDTH//2, panel_y + 120))
         self.screen.blit(subtitle_text, subtitle_rect)
         
-        # Neustart-Anweisung
+        # Neustart-Anweisung mit Schatten
+        restart_shadow = self.font.render("Drücke 'R' für Neustart", True, (0, 0, 0))
+        restart_shadow_rect = restart_shadow.get_rect(center=(WIDTH//2 + 2, panel_y + 170 + 2))
+        self.screen.blit(restart_shadow, restart_shadow_rect)
+        
         restart_text = self.font.render("Drücke 'R' für Neustart", True, (255, 255, 255))
-        restart_rect = restart_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50))
+        restart_rect = restart_text.get_rect(center=(WIDTH//2, panel_y + 170))
         self.screen.blit(restart_text, restart_rect)
         
-        # Finaler Punktestand
+        # Finaler Punktestand mit Schatten
+        final_score_shadow = self.font.render(f"Endpunktestand: {self.score}", True, (0, 0, 0))
+        final_score_shadow_rect = final_score_shadow.get_rect(center=(WIDTH//2 + 2, panel_y + 220 + 2))
+        self.screen.blit(final_score_shadow, final_score_shadow_rect)
+        
         final_score_text = self.font.render(f"Endpunktestand: {self.score}", True, (255, 255, 0))
-        final_score_rect = final_score_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 100))
+        final_score_rect = final_score_text.get_rect(center=(WIDTH//2, panel_y + 220))
         self.screen.blit(final_score_text, final_score_rect)
 
     def _check_boss_defeated(self):
