@@ -436,7 +436,17 @@ class Game:
                     if event.key == pygame.K_UP:
                         self.current_level.player.jump()
                     if event.key == pygame.K_SPACE:
-                        self.current_level.player.shoot(self.current_level.projectiles)
+                        # Schießrichtung basierend auf aktuell gedrückten Richtungstasten bestimmen
+                        keys = pygame.key.get_pressed()
+                        shoot_direction = None
+                        
+                        if keys[pygame.K_LEFT]:
+                            shoot_direction = -1  # Links schießen
+                        elif keys[pygame.K_RIGHT]:
+                            shoot_direction = 1   # Rechts schießen
+                        # Wenn keine Richtungstaste gedrückt, wird aktuelle facing_direction verwendet
+                        
+                        self.current_level.player.shoot(self.current_level.projectiles, shoot_direction)
                     # Debug: Schaden nehmen mit 'X' Taste
                     if event.key == pygame.K_x:
                         self.current_level.player.take_damage()
@@ -638,7 +648,7 @@ class Level:
         self.layout = None  # Level-Daten laden
 
         # Level-Größe (größer als der Bildschirm für Scrolling)
-        self.level_width = WIDTH * 3 # 3x so breit wie der Bildschirm
+        self.level_width = WIDTH * 16 # 16x so breit wie der Bildschirm für ein längeres Level
         self.level_height = HEIGHT
         
         # Kamera initialisieren
@@ -740,7 +750,8 @@ class Level:
                 try:
                     sprite = pygame.image.load(image_path).convert_alpha()
                     if sprite_key == 'boss':
-                            pass
+                        # Boss größer skalieren, aber nicht zu groß
+                        sprite = pygame.transform.scale(sprite, (80, 80))  # Boss-Größe
                     else:
                         sprite = pygame.transform.scale(sprite, (50, 50))  # Gegner-Größe
                     print(f"{sprite_key.capitalize()}-Sprite geladen: {image_path}")
@@ -764,62 +775,246 @@ class Level:
         ground_height = 50
         self.platforms.add(GroundPlatform(0, HEIGHT - ground_height, self.level_width, ground_height))
         
-        # Plattformen über das Level verteilt
-        platform_data = [
-            # (x, y, width, height)
-            (200, HEIGHT - 150, 200, 20),
-            (500, HEIGHT - 250, 150, 20),
-            (750, HEIGHT - 200, 100, 20),
-            (900, HEIGHT - 300, 200, 20),
-            (1200, HEIGHT - 150, 150, 20),
-            (1400, HEIGHT - 350, 100, 20),
-            (1600, HEIGHT - 200, 200, 20),
-            (1850, HEIGHT - 300, 150, 20),
-            (2100, HEIGHT - 250, 200, 20),
-            (2350, HEIGHT - 150, 150, 20),
+        # Level in Zonen aufteilen (jede Zone = WIDTH Breite)
+        # Zone 1-2: Tutorial/Einfach
+        # Zone 3-4: Mittel
+        # Zone 5-6: Schwer
+        # Zone 7-8: Sehr schwer
+        # Zone 9-10: Expert
+        # Zone 11-12: Nightmare
+        # Zone 13-14: Extreme
+        # Zone 15-16: Final Boss
+        
+        # ZONE 1-2: TUTORIAL & EINFÜHRUNG (0 - WIDTH*2)
+        # Garantiert erreichbare Plattformen (Max: 180 horizontal, 120 vertikal)
+        tutorial_platforms = [
+            (400, HEIGHT - 120, 200, 20),     # Erste Lernplattform
+            (550, HEIGHT - 200, 150, 20),     # Erreichbar (150 horizontal, 80 vertikal)
+            (750, HEIGHT - 140, 180, 20),     # Zurück nach unten (200 horizontal, 60 vertikal)
+            (1000, HEIGHT - 180, 150, 20),    # Mittlere Höhe (250 horizontal, 40 vertikal)
+            (1200, HEIGHT - 120, 200, 20),    # Leicht erreichbar (200 horizontal, 60 vertikal)
+            (1450, HEIGHT - 200, 180, 20),    # Letzte Tutorial-Plattform (250 horizontal, 80 vertikal)
         ]
         
-        for x, y, width, height in platform_data:
-            self.platforms.add(Platform(x, y, width, height))
-
-        # Enemies Random spawnen lassen
-
-        ENEMY_SPAWN_AREA_MAX = self.level_width - 500
-
-        spawnable_surfaces=list(self.platforms) #nur auf Plattformen
-
-        num_enemies_spawn = random.randint(ANZAHL_ENEMYS_MIN,ANZAHL_ENEMYS_MAX) #Zahl dazwischen
-        enemy_types =[
-              ('multiple_choice', MultipleChoiceEnemy),
-            ('python', PythonEnemy),
-            ('programming_task', ProgrammingTaskEnemy)
+        # ZONE 3-4: MITTLERER BEREICH (WIDTH*2 - WIDTH*4)
+        # Erreichbare Abstände mit progressiver Schwierigkeit
+        medium_platforms = [
+            (WIDTH*2 + 200, HEIGHT - 180, 120, 20),   # Zonenstart (einfacher Übergang)
+            (WIDTH*2 + 370, HEIGHT - 260, 100, 20),   # Erreichbar (170 horizontal, 80 vertikal)
+            (WIDTH*2 + 520, HEIGHT - 200, 80, 20),    # Abstieg (150 horizontal, 60 vertikal)
+            (WIDTH*2 + 680, HEIGHT - 300, 80, 20),    # Hoch (160 horizontal, 100 vertikal)
+            (WIDTH*2 + 840, HEIGHT - 220, 100, 20),   # Abstieg (160 horizontal, 80 vertikal)
+            (WIDTH*3 + 20, HEIGHT - 280, 80, 20),     # Übergang neue Zone (180 horizontal, 60 vertikal)
+            (WIDTH*3 + 180, HEIGHT - 200, 100, 20),   # Erreichbar (160 horizontal, 80 vertikal)
+            (WIDTH*3 + 350, HEIGHT - 320, 80, 20),    # Hohe Plattform (170 horizontal, 120 vertikal)
+            (WIDTH*3 + 500, HEIGHT - 240, 100, 20),   # Abstieg (150 horizontal, 80 vertikal)
         ]
-        for _ in range(num_enemies_spawn):
-            # Wähle eine zufällige Oberfläche zum Spawnen
-            spawn_surface = random.choice(spawnable_surfaces)
-            
-            # Berechne eine zufällige X-Position auf dieser Oberfläche
-            # Begrenze den Bereich, um Überhänge zu vermeiden
-            spawn_x = random.randint(
-                int(spawn_surface.rect.left), 
-                int(spawn_surface.rect.right - 50) # 50 ist die Gegnerbreite
-            )
+        
+        # ZONE 5-6: SCHWERER BEREICH (WIDTH*4 - WIDTH*6)
+        # Maximale aber noch erreichbare Sprünge
+        hard_platforms = [
+            (WIDTH*4 + 150, HEIGHT - 200, 80, 20),    # Zonenstart
+            (WIDTH*4 + 310, HEIGHT - 300, 60, 20),    # Erreichbar (160 horizontal, 100 vertikal)
+            (WIDTH*4 + 450, HEIGHT - 220, 60, 20),    # Abstieg (140 horizontal, 80 vertikal)
+            (WIDTH*4 + 600, HEIGHT - 340, 60, 20),    # Höchste Plattform (150 horizontal, 120 vertikal)
+            (WIDTH*4 + 740, HEIGHT - 260, 80, 20),    # Abstieg (140 horizontal, 80 vertikal)
+            (WIDTH*4 + 900, HEIGHT - 180, 80, 20),    # Niedrig (160 horizontal, 80 vertikal)
+            (WIDTH*5 + 70, HEIGHT - 280, 60, 20),     # Hoch (170 horizontal, 100 vertikal)
+            (WIDTH*5 + 210, HEIGHT - 200, 70, 20),    # Abstieg (140 horizontal, 80 vertikal)
+            (WIDTH*5 + 360, HEIGHT - 320, 50, 20),    # Sehr hoch (150 horizontal, 120 vertikal)
+            (WIDTH*5 + 490, HEIGHT - 240, 80, 20),    # Abstieg (130 horizontal, 80 vertikal)
+            (WIDTH*5 + 650, HEIGHT - 180, 100, 20),   # Übergang Boss-Zone (160 horizontal, 60 vertikal)
+        ]
+        
+        # ZONE 7-8: SEHR SCHWER (WIDTH*6 - WIDTH*8)
+        very_hard_platforms = [
+            (WIDTH*6 + 200, HEIGHT - 220, 80, 20),    # Übergang von schwer
+            (WIDTH*6 + 350, HEIGHT - 300, 60, 20),    # Hoch (150 horizontal, 80 vertikal)
+            (WIDTH*6 + 480, HEIGHT - 200, 60, 20),    # Abstieg (130 horizontal, 100 vertikal)
+            (WIDTH*6 + 610, HEIGHT - 340, 50, 20),    # Sehr hoch (130 horizontal, 140 vertikal)
+            (WIDTH*6 + 730, HEIGHT - 260, 60, 20),    # Abstieg (120 horizontal, 80 vertikal)
+            (WIDTH*6 + 860, HEIGHT - 180, 70, 20),    # Niedrig (130 horizontal, 80 vertikal)
+            (WIDTH*7 + 10, HEIGHT - 320, 50, 20),     # Übergang hoch (150 horizontal, 140 vertikal)
+            (WIDTH*7 + 140, HEIGHT - 240, 60, 20),    # Abstieg (130 horizontal, 80 vertikal)
+            (WIDTH*7 + 270, HEIGHT - 160, 80, 20),    # Niedrig (130 horizontal, 80 vertikal)
+            (WIDTH*7 + 420, HEIGHT - 280, 60, 20),    # Hoch (150 horizontal, 120 vertikal)
+            (WIDTH*7 + 550, HEIGHT - 200, 80, 20),    # Abstieg (130 horizontal, 80 vertikal)
+        ]
+        
+        # ZONE 9-10: EXPERT (WIDTH*8 - WIDTH*10)
+        expert_platforms = [
+            (WIDTH*8 + 150, HEIGHT - 240, 60, 20),    # Expertenstart
+            (WIDTH*8 + 270, HEIGHT - 320, 50, 20),    # Hoch (120 horizontal, 80 vertikal)
+            (WIDTH*8 + 390, HEIGHT - 200, 50, 20),    # Abstieg (120 horizontal, 120 vertikal)
+            (WIDTH*8 + 510, HEIGHT - 340, 40, 20),    # Sehr hoch (120 horizontal, 140 vertikal)
+            (WIDTH*8 + 620, HEIGHT - 260, 50, 20),    # Abstieg (110 horizontal, 80 vertikal)
+            (WIDTH*8 + 740, HEIGHT - 180, 60, 20),    # Niedrig (120 horizontal, 80 vertikal)
+            (WIDTH*8 + 870, HEIGHT - 300, 50, 20),    # Hoch (130 horizontal, 120 vertikal)
+            (WIDTH*9 + 20, HEIGHT - 220, 60, 20),     # Übergang (150 horizontal, 80 vertikal)
+            (WIDTH*9 + 150, HEIGHT - 340, 40, 20),    # Sehr hoch (130 horizontal, 120 vertikal)
+            (WIDTH*9 + 260, HEIGHT - 200, 50, 20),    # Abstieg (110 horizontal, 140 vertikal)
+            (WIDTH*9 + 380, HEIGHT - 280, 50, 20),    # Hoch (120 horizontal, 80 vertikel)
+            (WIDTH*9 + 500, HEIGHT - 160, 70, 20),    # Niedrig (120 horizontal, 120 vertikal)
+            (WIDTH*9 + 630, HEIGHT - 240, 60, 20),    # Mittel (130 horizontal, 80 vertikal)
+        ]
+        
+        # ZONE 11-12: NIGHTMARE (WIDTH*10 - WIDTH*12)
+        nightmare_platforms = [
+            (WIDTH*10 + 100, HEIGHT - 200, 50, 20),   # Nightmare Start
+            (WIDTH*10 + 210, HEIGHT - 320, 40, 20),   # Hoch (110 horizontal, 120 vertikal)
+            (WIDTH*10 + 310, HEIGHT - 240, 40, 20),   # Abstieg (100 horizontal, 80 vertikal)
+            (WIDTH*10 + 410, HEIGHT - 360, 30, 20),   # Extrem hoch (100 horizontal, 120 vertikal)
+            (WIDTH*10 + 500, HEIGHT - 280, 40, 20),   # Abstieg (90 horizontal, 80 vertikal)
+            (WIDTH*10 + 600, HEIGHT - 200, 50, 20),   # Niedrig (100 horizontal, 80 vertikal)
+            (WIDTH*10 + 720, HEIGHT - 340, 30, 20),   # Sehr hoch (120 horizontal, 140 vertikal)
+            (WIDTH*10 + 810, HEIGHT - 260, 40, 20),   # Abstieg (90 horizontal, 80 vertikal)
+            (WIDTH*10 + 920, HEIGHT - 180, 50, 20),   # Niedrig (110 horizontal, 80 vertikal)
+            (WIDTH*11 + 50, HEIGHT - 300, 40, 20),    # Übergang hoch (130 horizontal, 120 vertikal)
+            (WIDTH*11 + 160, HEIGHT - 220, 40, 20),   # Abstieg (110 horizontal, 80 vertikal)
+            (WIDTH*11 + 270, HEIGHT - 340, 30, 20),   # Sehr hoch (110 horizontal, 120 vertikal)
+            (WIDTH*11 + 360, HEIGHT - 260, 40, 20),   # Abstieg (90 horizontal, 80 vertikal)
+            (WIDTH*11 + 470, HEIGHT - 180, 50, 20),   # Niedrig (110 horizontal, 80 vertikal)
+            (WIDTH*11 + 590, HEIGHT - 280, 40, 20),   # Hoch (120 horizontal, 100 vertikal)
+        ]
+        
+        # ZONE 13-14: EXTREME (WIDTH*12 - WIDTH*14)
+        extreme_platforms = [
+            (WIDTH*12 + 80, HEIGHT - 220, 40, 20),    # Extreme Start
+            (WIDTH*12 + 180, HEIGHT - 340, 30, 20),   # Extrem hoch (100 horizontal, 120 vertikal)
+            (WIDTH*12 + 270, HEIGHT - 260, 30, 20),   # Abstieg (90 horizontal, 80 vertikal)
+            (WIDTH*12 + 360, HEIGHT - 180, 40, 20),   # Niedrig (90 horizontal, 80 vertikal)
+            (WIDTH*12 + 470, HEIGHT - 320, 30, 20),   # Hoch (110 horizontal, 140 vertikal)
+            (WIDTH*12 + 560, HEIGHT - 240, 30, 20),   # Abstieg (90 horizontal, 80 vertikal)
+            (WIDTH*12 + 650, HEIGHT - 360, 25, 20),   # Extrem hoch (90 horizontal, 120 vertikal)
+            (WIDTH*12 + 730, HEIGHT - 280, 30, 20),   # Abstieg (80 horizontal, 80 vertikal)
+            (WIDTH*12 + 820, HEIGHT - 200, 40, 20),   # Niedrig (90 horizontal, 80 vertikal)
+            (WIDTH*12 + 930, HEIGHT - 300, 30, 20),   # Hoch (110 horizontal, 100 vertikal)
+            (WIDTH*13 + 40, HEIGHT - 220, 30, 20),    # Übergang (110 horizontal, 80 vertikal)
+            (WIDTH*13 + 140, HEIGHT - 340, 25, 20),   # Extrem hoch (100 horizontal, 120 vertikal)
+            (WIDTH*13 + 220, HEIGHT - 260, 30, 20),   # Abstieg (80 horizontal, 80 vertikal)
+            (WIDTH*13 + 310, HEIGHT - 180, 40, 20),   # Niedrig (90 horizontal, 80 vertikal)
+            (WIDTH*13 + 420, HEIGHT - 300, 30, 20),   # Hoch (110 horizontal, 120 vertikal)
+            (WIDTH*13 + 520, HEIGHT - 240, 40, 20),   # Abstieg (100 horizontal, 60 vertikal)
+        ]
+        
+        # ZONE 15-16: FINAL BOSS (WIDTH*14 - WIDTH*16)
+        final_boss_platforms = [
+            (WIDTH*14 + 200, HEIGHT - 220, 100, 20),  # Pre-Boss Plattform
+            (WIDTH*14 + 350, HEIGHT - 300, 80, 20),   # Boss-Kampf hoch
+            (WIDTH*14 + 500, HEIGHT - 180, 80, 20),   # Boss-Kampf niedrig
+            (WIDTH*14 + 650, HEIGHT - 260, 80, 20),   # Boss-Kampf mittel
+            (WIDTH*15 + 50, HEIGHT - 200, 120, 20),   # Boss-Arena Mitte
+            (WIDTH*15 + 220, HEIGHT - 300, 100, 20),  # Boss-Arena hoch
+            (WIDTH*15 + 370, HEIGHT - 220, 100, 20),  # Boss-Arena abstieg
+            (WIDTH*15 + 520, HEIGHT - 340, 80, 20),   # Boss-Arena sehr hoch
+            (WIDTH*15 + 650, HEIGHT - 160, 150, 20),  # Boss-Arena Ende
+        ]
+        
+        # Alle Plattformen hinzufügen
+        for platforms in [tutorial_platforms, medium_platforms, hard_platforms, very_hard_platforms, 
+                         expert_platforms, nightmare_platforms, extreme_platforms, final_boss_platforms]:
+            for x, y, width, height in platforms:
+                self.platforms.add(Platform(x, y, width, height))
+        
+        # GEGNER-PLATZIERUNG (progressiv schwieriger)
+        # Zone 1-2: Wenige, einfache Gegner
+        easy_enemies = [
+            (500, HEIGHT - 100, MultipleChoiceEnemy),
+            (1200, HEIGHT - 100, MultipleChoiceEnemy),
+            (1800, HEIGHT - 100, PythonEnemy),
+        ]
+        
+        # Zone 3-4: Mehr Gegner, gemischte Typen
+        medium_enemies = [
+            (WIDTH*2 + 300, HEIGHT - 100, PythonEnemy),
+            (WIDTH*2 + 600, HEIGHT - 250, MultipleChoiceEnemy),
+            (WIDTH*2 + 900, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*3 + 200, HEIGHT - 350, PythonEnemy),
+            (WIDTH*3 + 500, HEIGHT - 100, MultipleChoiceEnemy),
+            (WIDTH*3 + 800, HEIGHT - 100, ProgrammingTaskEnemy),
+        ]
+        
+        # Zone 5-6: Viele Gegner, schwierige Positionen
+        hard_enemies = [
+            (WIDTH*4 + 200, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*4 + 400, HEIGHT - 300, PythonEnemy),
+            (WIDTH*4 + 600, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*4 + 800, HEIGHT - 250, MultipleChoiceEnemy),
+            (WIDTH*5 + 150, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*5 + 350, HEIGHT - 330, PythonEnemy),
+            (WIDTH*5 + 600, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*5 + 850, HEIGHT - 100, MultipleChoiceEnemy),
+        ]
+        
+        # Zone 7-8: Sehr schwere Gegner
+        very_hard_enemies = [
+            (WIDTH*6 + 300, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*6 + 600, HEIGHT - 340, ProgrammingTaskEnemy),
+            (WIDTH*6 + 900, HEIGHT - 100, PythonEnemy),
+            (WIDTH*7 + 200, HEIGHT - 320, ProgrammingTaskEnemy),
+            (WIDTH*7 + 500, HEIGHT - 100, ProgrammingTaskEnemy),
+        ]
+        
+        # Zone 9-10: Expert Gegner
+        expert_enemies = [
+            (WIDTH*8 + 200, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*8 + 450, HEIGHT - 340, ProgrammingTaskEnemy),
+            (WIDTH*8 + 700, HEIGHT - 100, PythonEnemy),
+            (WIDTH*8 + 950, HEIGHT - 300, ProgrammingTaskEnemy),
+            (WIDTH*9 + 200, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*9 + 450, HEIGHT - 340, PythonEnemy),
+            (WIDTH*9 + 700, HEIGHT - 100, ProgrammingTaskEnemy),
+        ]
+        
+        # Zone 11-12: Nightmare Gegner
+        nightmare_enemies = [
+            (WIDTH*10 + 150, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*10 + 350, HEIGHT - 360, ProgrammingTaskEnemy),
+            (WIDTH*10 + 550, HEIGHT - 100, PythonEnemy),
+            (WIDTH*10 + 750, HEIGHT - 340, ProgrammingTaskEnemy),
+            (WIDTH*10 + 950, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*11 + 200, HEIGHT - 340, PythonEnemy),
+            (WIDTH*11 + 400, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*11 + 650, HEIGHT - 280, ProgrammingTaskEnemy),
+        ]
+        
+        # Zone 13-14: Extreme Gegner
+        extreme_enemies = [
+            (WIDTH*12 + 130, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*12 + 320, HEIGHT - 360, ProgrammingTaskEnemy),
+            (WIDTH*12 + 520, HEIGHT - 100, PythonEnemy),
+            (WIDTH*12 + 720, HEIGHT - 360, ProgrammingTaskEnemy),
+            (WIDTH*12 + 920, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*13 + 150, HEIGHT - 340, PythonEnemy),
+            (WIDTH*13 + 350, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*13 + 550, HEIGHT - 300, ProgrammingTaskEnemy),
+        ]
+        
+        # Zone 15: Pre-Final-Boss Gegner
+        prefinal_enemies = [
+            (WIDTH*14 + 300, HEIGHT - 100, ProgrammingTaskEnemy),
+            (WIDTH*14 + 600, HEIGHT - 300, ProgrammingTaskEnemy),
+            (WIDTH*14 + 900, HEIGHT - 100, PythonEnemy),
+            (WIDTH*15 + 200, HEIGHT - 340, ProgrammingTaskEnemy),
+        ]
+        
+        # Gegner hinzufügen
+        for enemy_group in [easy_enemies, medium_enemies, hard_enemies, very_hard_enemies,
+                           expert_enemies, nightmare_enemies, extreme_enemies, prefinal_enemies]:
+            for x, y, enemy_class in enemy_group:
+                sprite_map = {
+                    MultipleChoiceEnemy: 'multiple_choice',
+                    PythonEnemy: 'python',
+                    ProgrammingTaskEnemy: 'programming_task'
+                }
+                sprite_key = sprite_map.get(enemy_class, 'multiple_choice')
+                enemy = enemy_class(x, y, self.enemy_sprites[sprite_key], self.level_width)
+                self.enemies.add(enemy)
 
-            # Spawn nur im definierten Spielbereich
-            if not (ENEMY_SPAWN_AREA_MIN < spawn_x < ENEMY_SPAWN_AREA_MAX):
-                continue # Wenn nicht im Spiel nochmal probieren
-
-            spawn_y = spawn_surface.rect.top - 51 # 51 nicht in Plattform
-
-            enemy_key, enemy_class = random.choice(enemy_types) #Gegnerauswahl
-            
-            enemy = enemy_class(spawn_x, spawn_y, self.enemy_sprites[enemy_key], self.level_width) #einfügen
-            self.enemies.add(enemy)
-
-        # Boss am Ende hinzufügen 
-        boss_x = self.level_width - 450  # Boss am rechten Ende des Levels
+        # FINAL BOSS am Ende
+        boss_x = self.level_width - 400  # Boss am rechten Ende des Levels
         boss_y = HEIGHT - 200  # Etwas höher als der Boden
-        boss = Boss(boss_x, boss_y, self.enemy_sprites['boss'], self.level_width)  # übergib level_width
+        boss = Boss(boss_x, boss_y, self.enemy_sprites['boss'], self.level_width)
         self.enemies.add(boss)
         boss.projectiles = self.projectiles   
         
@@ -959,34 +1154,185 @@ class Level:
         from powerups import (DoubleEspresso, CheatsheetScroll, SemesterbreakAura, 
                              MotivationFishBread, Creditpoint, Grade)
         
-        # PowerUps an verschiedenen Positionen im Level
+        # POWERUPS - Selten und abwechslungsreich platziert
         powerup_positions = [
-            (300, HEIGHT - 200, DoubleEspresso),
-            (800, HEIGHT - 250, CheatsheetScroll),
-            (1100, HEIGHT - 350, SemesterbreakAura),
-            (1500, HEIGHT - 400, MotivationFishBread),
-            (1900, HEIGHT - 350, DoubleEspresso),
-            (2300, HEIGHT - 200, CheatsheetScroll),
+            (1100, HEIGHT - 220, DoubleEspresso),               # Zone 1: Über vierter Plattform
+            
+            # Zone 3-4: Zwei PowerUps
+            (WIDTH*2 + 730, HEIGHT - 340, CheatsheetScroll),    # Über vierter Plattform (hohe Plattform)
+            (WIDTH*3 + 400, HEIGHT - 360, MotivationFishBread), # Über achter Plattform (hohe Plattform)
+            
+            # Zone 5-6: Drei PowerUps (schwerer zu erreichen)
+            (WIDTH*4 + 360, HEIGHT - 340, SemesterbreakAura),   # Über zweiter Plattform (hoch)
+            (WIDTH*4 + 650, HEIGHT - 380, DoubleEspresso),      # Über vierter Plattform (höchste)
+            (WIDTH*5 + 410, HEIGHT - 360, CheatsheetScroll),    # Über neunter Plattform (sehr hoch)
+            
+            # Zone 7-8: Sehr schwer PowerUps
+            (WIDTH*6 + 660, HEIGHT - 380, SemesterbreakAura),   # Über sehr hoher Plattform
+            (WIDTH*7 + 470, HEIGHT - 320, MotivationFishBread), # Über hoher Plattform
+            
+            # Zone 9-10: Expert PowerUps
+            (WIDTH*8 + 560, HEIGHT - 380, DoubleEspresso),      # Über sehr hoher Plattform
+            (WIDTH*9 + 200, HEIGHT - 380, CheatsheetScroll),    # Über sehr hoher Plattform
+            
+            # Zone 11-12: Nightmare PowerUps
+            (WIDTH*10 + 460, HEIGHT - 400, SemesterbreakAura),  # Über extrem hoher Plattform
+            (WIDTH*11 + 320, HEIGHT - 380, MotivationFishBread), # Über sehr hoher Plattform
+            
+            # Zone 13-14: Extreme PowerUps
+            (WIDTH*12 + 700, HEIGHT - 400, DoubleEspresso),     # Über extrem hoher Plattform
+            (WIDTH*13 + 470, HEIGHT - 340, CheatsheetScroll),   # Über hoher Plattform
+            
+            # Zone 15: Pre-Final-Boss PowerUp
+            (WIDTH*15 + 570, HEIGHT - 380, SemesterbreakAura),  # Über Boss-Arena sehr hoch
         ]
         
         for x, y, powerup_class in powerup_positions:
             self.powerups.add(powerup_class(x, y))
         
-        # Credit Points über das gesamte Level verteilt
-        for i in range(20):
-            x = 200 + i * 150  # Alle 150 Pixel ein Credit Point
-            y = HEIGHT - 100
-            # Einige in der Luft platzieren
-            if i % 3 == 0:
-                y = HEIGHT - 200
-            self.collectibles.add(Creditpoint(x, y))
+        # CREDIT POINTS - Abwechslungsreich verteilt (Boden, Luft, Plattformen)
+        # Zone 1-2: Tutorial - gemischte Platzierung
+        cp_positions_tutorial = [
+            (500, HEIGHT - 160),   # Über erste Plattform (550, HEIGHT - 200)
+            (650, HEIGHT - 100),   # Am Boden zwischen Plattformen
+            (850, HEIGHT - 180),   # Über dritte Plattform (750, HEIGHT - 140)
+            (1100, HEIGHT - 220),  # Über vierte Plattform (1000, HEIGHT - 180)
+            (1300, HEIGHT - 160),  # Über fünfte Plattform (1200, HEIGHT - 120)
+            (1550, HEIGHT - 240),  # Über sechste Plattform (1450, HEIGHT - 200)
+            (1700, HEIGHT - 100),  # Am Boden am Ende
+        ]
         
-        # Versteckte Grades (1,0-Noten) an besonderen Orten
+        # Zone 3-4: Mittlere Verteilung - mehr Abwechslung
+        cp_positions_medium = [
+            (WIDTH*2 + 100, HEIGHT - 100),   # Am Boden vor Zone
+            (WIDTH*2 + 250, HEIGHT - 220),   # Über erste Plattform (WIDTH*2 + 200, HEIGHT - 180)
+            (WIDTH*2 + 420, HEIGHT - 300),   # Über zweite Plattform (WIDTH*2 + 370, HEIGHT - 260)
+            (WIDTH*2 + 570, HEIGHT - 240),   # Über dritte Plattform (WIDTH*2 + 520, HEIGHT - 200)
+            (WIDTH*2 + 730, HEIGHT - 340),   # Über vierte Plattform (WIDTH*2 + 680, HEIGHT - 300)
+            (WIDTH*2 + 890, HEIGHT - 260),   # Über fünfte Plattform (WIDTH*2 + 840, HEIGHT - 220)
+            (WIDTH*2 + 950, HEIGHT - 100),   # Am Boden
+            (WIDTH*3 + 70, HEIGHT - 320),    # Über sechste Plattform (WIDTH*3 + 20, HEIGHT - 280)
+            (WIDTH*3 + 230, HEIGHT - 240),   # Über siebte Plattform (WIDTH*3 + 180, HEIGHT - 200)
+            (WIDTH*3 + 400, HEIGHT - 360),   # Über achte Plattform (WIDTH*3 + 350, HEIGHT - 320)
+            (WIDTH*3 + 550, HEIGHT - 280),   # Über neunte Plattform (WIDTH*3 + 500, HEIGHT - 240)
+            (WIDTH*3 + 700, HEIGHT - 100),   # Am Boden am Ende
+        ]
+        
+        # Zone 5-6: Spärliche Verteilung - herausfordernder
+        cp_positions_hard = [
+            (WIDTH*4 + 50, HEIGHT - 100),    # Am Boden vor Zone
+            (WIDTH*4 + 250, HEIGHT - 320),   # Über erste Plattform
+            (WIDTH*4 + 350, HEIGHT - 150),   # In der Luft (schwer erreichbar)
+            (WIDTH*4 + 550, HEIGHT - 420),   # Über sehr hoher Plattform
+            (WIDTH*4 + 700, HEIGHT - 100),   # Am Boden (große Lücke)
+            (WIDTH*4 + 950, HEIGHT - 240),   # Über dritter Plattform
+            (WIDTH*5 + 150, HEIGHT - 150),   # In der Luft
+            (WIDTH*5 + 350, HEIGHT - 390),   # Über höchster Plattform
+            (WIDTH*5 + 550, HEIGHT - 100),   # Am Boden
+            (WIDTH*5 + 750, HEIGHT - 260),   # Über letzter Plattform
+        ]
+        
+        # Zone 7-8: Sehr schwer - wenige, strategische CPs
+        cp_positions_very_hard = [
+            (WIDTH*6 + 150, HEIGHT - 100),   # Am Boden vor Zone
+            (WIDTH*6 + 400, HEIGHT - 340),   # Über hoher Plattform
+            (WIDTH*6 + 660, HEIGHT - 380),   # Über sehr hoher Plattform
+            (WIDTH*6 + 910, HEIGHT - 220),   # Über niedrigerer Plattform
+            (WIDTH*7 + 190, HEIGHT - 280),   # Über mittlerer Plattform
+            (WIDTH*7 + 470, HEIGHT - 320),   # Über hoher Plattform
+            (WIDTH*7 + 600, HEIGHT - 240),   # Über niedrigerer Plattform
+        ]
+        
+        # Zone 9-10: Expert - spärliche Verteilung
+        cp_positions_expert = [
+            (WIDTH*8 + 100, HEIGHT - 100),   # Am Boden vor Zone
+            (WIDTH*8 + 320, HEIGHT - 360),   # Über hoher Plattform
+            (WIDTH*8 + 560, HEIGHT - 380),   # Über sehr hoher Plattform
+            (WIDTH*8 + 790, HEIGHT - 220),   # Über niedrigerer Plattform
+            (WIDTH*8 + 920, HEIGHT - 340),   # Über hoher Plattform
+            (WIDTH*9 + 70, HEIGHT - 260),    # Über mittlerer Plattform
+            (WIDTH*9 + 200, HEIGHT - 380),   # Über sehr hoher Plattform
+            (WIDTH*9 + 430, HEIGHT - 320),   # Über hoher Plattform
+            (WIDTH*9 + 550, HEIGHT - 200),   # Über niedrigerer Plattform
+            (WIDTH*9 + 680, HEIGHT - 280),   # Über mittlerer Plattform
+        ]
+        
+        # Zone 11-12: Nightmare - sehr spärlich
+        cp_positions_nightmare = [
+            (WIDTH*10 + 50, HEIGHT - 100),   # Am Boden vor Zone
+            (WIDTH*10 + 260, HEIGHT - 360),  # Über hoher Plattform
+            (WIDTH*10 + 460, HEIGHT - 400),  # Über extrem hoher Plattform
+            (WIDTH*10 + 650, HEIGHT - 240),  # Über niedrigerer Plattform
+            (WIDTH*10 + 860, HEIGHT - 380),  # Über sehr hoher Plattform
+            (WIDTH*11 + 100, HEIGHT - 340),  # Über hoher Plattform
+            (WIDTH*11 + 320, HEIGHT - 380),  # Über sehr hoher Plattform
+            (WIDTH*11 + 520, HEIGHT - 220),  # Über niedrigerer Plattform
+            (WIDTH*11 + 640, HEIGHT - 320),  # Über hoher Plattform
+        ]
+        
+        # Zone 13-14: Extreme - minimal
+        cp_positions_extreme = [
+            (WIDTH*12 + 30, HEIGHT - 100),   # Am Boden vor Zone
+            (WIDTH*12 + 230, HEIGHT - 380),  # Über extrem hoher Plattform
+            (WIDTH*12 + 410, HEIGHT - 220),  # Über niedrigerer Plattform
+            (WIDTH*12 + 570, HEIGHT - 280),  # Über mittlerer Plattform
+            (WIDTH*12 + 700, HEIGHT - 400),  # Über extrem hoher Plattform
+            (WIDTH*12 + 870, HEIGHT - 240),  # Über niedrigerer Plattform
+            (WIDTH*13 + 90, HEIGHT - 260),   # Über mittlerer Plattform
+            (WIDTH*13 + 190, HEIGHT - 380),  # Über extrem hoher Plattform
+            (WIDTH*13 + 360, HEIGHT - 220),  # Über niedrigerer Plattform
+            (WIDTH*13 + 470, HEIGHT - 340),  # Über hoher Plattform
+        ]
+        
+        # Zone 15-16: Final Boss - strategische CPs
+        cp_positions_final_boss = [
+            (WIDTH*14 + 150, HEIGHT - 100),  # Am Boden vor Final Boss-Zone
+            (WIDTH*14 + 400, HEIGHT - 340),  # Über hoher Plattform
+            (WIDTH*14 + 700, HEIGHT - 300),  # Über mittlerer Plattform
+            (WIDTH*15 + 100, HEIGHT - 240),  # Über Boss-Arena Plattform
+            (WIDTH*15 + 320, HEIGHT - 340),  # Über hoher Boss-Arena Plattform
+            (WIDTH*15 + 570, HEIGHT - 380),  # Über sehr hoher Boss-Arena Plattform
+            (WIDTH*15 + 800, HEIGHT - 200),  # Über Boss-Arena Ende
+        ]
+        
+        # Alle Credit Points hinzufügen
+        for positions in [cp_positions_tutorial, cp_positions_medium, cp_positions_hard, cp_positions_very_hard,
+                         cp_positions_expert, cp_positions_nightmare, cp_positions_extreme, cp_positions_final_boss]:
+            for x, y in positions:
+                self.collectibles.add(Creditpoint(x, y))
+        
+        # GRADES (1,0-NOTEN) - Sehr selten und schwer erreichbar (verschoben um Überlappungen zu vermeiden)
         grade_positions = [
-            (400, HEIGHT - 180),
-            (1000, HEIGHT - 400),
-            (1800, HEIGHT - 350),
-            (2400, HEIGHT - 200),
+            # Zone 2: Erste Note (als Belohnung für Plattform-Sprung)
+            (1300, HEIGHT - 160),  # Über fünfter Plattform (verschoben von PowerUp-Position)
+            
+            # Zone 3-4: Versteckte Noten (verschoben um PowerUp-Überlappungen zu vermeiden)
+            (WIDTH*2 + 420, HEIGHT - 300),    # Über zweiter Plattform statt vierter
+            (WIDTH*3 + 550, HEIGHT - 280),    # Über neunter Plattform statt achter
+            
+            # Zone 5-6: Schwierige Noten (verschoben)
+            (WIDTH*4 + 310, HEIGHT - 340),    # Über zweiter Plattform (andere Position)
+            (WIDTH*5 + 210, HEIGHT - 240),    # Über siebter Plattform statt neunter
+            
+            # Zone 7-8: Sehr schwer Belohnungen (verschoben)
+            (WIDTH*6 + 350, HEIGHT - 340),    # Über zweiter Plattform statt sechster
+            (WIDTH*7 + 140, HEIGHT - 280),    # Über fünfter Plattform statt achter
+            
+            # Zone 9-10: Expert Belohnungen (verschoben)
+            (WIDTH*8 + 270, HEIGHT - 360),    # Über zweiter Plattform statt zehnter
+            (WIDTH*9 + 380, HEIGHT - 320),    # Über elfter Plattform statt zehnter
+            
+            # Zone 11-12: Nightmare Belohnungen (verschoben)
+            (WIDTH*10 + 210, HEIGHT - 360),   # Über zweiter Plattform statt vierter
+            (WIDTH*11 + 160, HEIGHT - 260),   # Über elfter Plattform statt zwölfter
+            
+            # Zone 13-14: Extreme Belohnungen (verschoben)
+            (WIDTH*12 + 180, HEIGHT - 380),   # Über zweiter Plattform statt zehnter
+            (WIDTH*13 + 140, HEIGHT - 380),   # Über zwölfter Plattform statt vierzehnter
+            
+            # Zone 15-16: Final Boss Belohnungen (verschoben)
+            (WIDTH*15 + 220, HEIGHT - 340),   # Über sechster Boss-Arena Plattform statt achter
+            (WIDTH*15 + 720, HEIGHT - 200),   # Über letzter Boss-Arena Plattform (verschoben)
         ]
         
         for x, y in grade_positions:

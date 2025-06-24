@@ -8,6 +8,8 @@ class Character(pygame.sprite.Sprite):
         # Nur mit weißer Farbe füllen, wenn kein Sprite vorhanden ist
         if sprite is None:
             self.image.fill(COLOR_WHITE)
+        
+        # Kollisionsbox exakt auf Sprite-Größe setzen
         self.rect = self.image.get_rect(topleft=(x, y))
         self.velocity = pygame.math.Vector2(0, 0)
         self.health = ENEMY_HEALTH

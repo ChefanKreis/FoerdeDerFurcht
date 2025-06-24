@@ -11,8 +11,10 @@ class Weapon:
 
     def fire(self, projectiles_group):
         if self.cooldown <= 0:
-            # Richtung vom Player übernehmen (falls verfügbar)
-            if hasattr(self.owner, 'facing_direction'):
+            # Schießrichtung vom Player übernehmen (falls verfügbar)
+            if hasattr(self.owner, 'shoot_direction'):
+                direction = self.owner.shoot_direction
+            elif hasattr(self.owner, 'facing_direction'):
                 direction = self.owner.facing_direction
             else:
                 # Fallback: Richtung basierend auf aktueller Bewegung
@@ -59,8 +61,20 @@ class Projectile(pygame.sprite.Sprite):
 class Bubble(Projectile):
     def __init__(self, x, y, direction=1, captured_enemy=None, level_width=WIDTH):
         super().__init__(x, y, None)
-        self.image = pygame.Surface((20, 20), pygame.SRCALPHA)  # Transparente Oberfläche
-        pygame.draw.circle(self.image, COLOR_BUBBLE, (10, 10), 10, 2)  # Blaue Blase
+        
+        # Versuche bubble.png zu laden
+        try:
+            self.base_image = pygame.image.load("images/bubble.png").convert_alpha()
+            # Skaliere auf passende Größe (20x20 für normale Blase)
+            self.image = pygame.transform.scale(self.base_image, (20, 20))
+            print("Bubble-Sprite geladen: images/bubble.png")
+        except (pygame.error, FileNotFoundError) as e:
+            print(f"Bubble-Sprite 'bubble.png' konnte nicht geladen werden: {e}")
+            # Fallback: Gezeichnete Blase
+            self.base_image = None
+            self.image = pygame.Surface((20, 20), pygame.SRCALPHA)
+            pygame.draw.circle(self.image, COLOR_BUBBLE, (10, 10), 10, 2)
+        
         self.rect = self.image.get_rect(center=(x, y))
         self.velocity = pygame.math.Vector2(direction * BUBBLE_SPEED, 0)  # Horizontale Bewegung
         self.captured_enemy = captured_enemy
@@ -137,11 +151,20 @@ class Bubble(Projectile):
             enemy.velocity = pygame.math.Vector2(0, 0)  # Gegner kann sich nicht bewegen
             
             # Blase wird größer mit gefangenem Gegner
-            self.image = pygame.Surface((30, 30), pygame.SRCALPHA)
-            pygame.draw.circle(self.image, COLOR_BUBBLE, (15, 15), 15, 2)
-            # Gegner in der Blase zeichnen (kleiner)
-            enemy_mini = pygame.transform.scale(enemy.image, (20, 20))
-            self.image.blit(enemy_mini, (5, 5))
+            if self.base_image:
+                # Verwende Sprite-Textur, größer skaliert
+                self.image = pygame.transform.scale(self.base_image, (30, 30))
+                # Gegner in der Blase zeichnen (kleiner)
+                enemy_mini = pygame.transform.scale(enemy.image, (20, 20))
+                self.image.blit(enemy_mini, (5, 5))
+            else:
+                # Fallback: Gezeichnete Blase
+                self.image = pygame.Surface((30, 30), pygame.SRCALPHA)
+                pygame.draw.circle(self.image, COLOR_BUBBLE, (15, 15), 15, 2)
+                # Gegner in der Blase zeichnen (kleiner)
+                enemy_mini = pygame.transform.scale(enemy.image, (20, 20))
+                self.image.blit(enemy_mini, (5, 5))
+            
             self.rect = self.image.get_rect(center=self.rect.center)
             
             # Gegner aus der normalen Update-Schleife entfernen

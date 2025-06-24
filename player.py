@@ -15,6 +15,7 @@ class Player(Character):
         # Animation-System
         self.current_animation = 'idle'
         self.facing_direction = 1  # 1 = rechts, -1 = links
+        self.shoot_direction = 1   # Separate Schießrichtung
         self.lives = PLAYER_LIVES
         self.weapon = Weapon(self)
         self.is_invincible = False
@@ -39,7 +40,17 @@ class Player(Character):
         self.enemies_frozen = False
         self.has_semesterbreak_aura = False
 
-    def shoot(self, projectiles_group):
+    def shoot(self, projectiles_group, direction=None):
+        # Schießrichtung setzen (getrennt von der Sprite-Richtung)
+        if direction is not None:
+            self.shoot_direction = direction
+        else:
+            # Keine Richtung angegeben: Aktuelle facing_direction verwenden
+            self.shoot_direction = self.facing_direction
+        
+        # facing_direction wird NIEMALS durch Schießen geändert!
+        # Sie wird nur durch Bewegung in update() bestimmt
+        
         # Waffe abfeuern
         return self.weapon.fire(projectiles_group)
 
@@ -76,15 +87,22 @@ class Player(Character):
             # Wenn self.lives <= 0, wird das Game Over vom Game-Objekt behandelt
 
     def update(self, platforms=None):
-        # Richtung basierend auf Bewegung aktualisieren
+        # facing_direction wird NUR durch Bewegung bestimmt
+        old_facing_direction = self.facing_direction
+        
         if self.velocity.x > 0:
             self.facing_direction = 1  # nach rechts
         elif self.velocity.x < 0:
             self.facing_direction = -1  # nach links
-        # Bei velocity.x == 0 bleibt die letzte Richtung erhalten
+        # Bei velocity.x == 0 bleibt facing_direction erhalten
+        # shoot_direction bleibt unverändert und wird nur beim Schießen gesetzt
         
         # Animation basierend auf Zustand aktualisieren
         self._update_animation()
+        
+        # Sprite sofort aktualisieren wenn sich die Richtung geändert hat
+        if old_facing_direction != self.facing_direction:
+            self._apply_current_sprite()
         
         super().update(platforms)
         self.weapon.update()  # Weapon-Cooldown aktualisieren
@@ -126,6 +144,9 @@ class Player(Character):
         # Basis-Sprite holen
         base_sprite = self.sprites[self.current_animation]
         
+        # Aktuelle Position merken
+        old_center = self.rect.center
+        
         # Spiegelung anwenden falls nötig
         if self.facing_direction == -1:
             # Nach links: Sprite horizontal spiegeln
@@ -133,6 +154,10 @@ class Player(Character):
         else:
             # Nach rechts: Original-Sprite verwenden
             self.image = base_sprite
+        
+        # Kollisionsbox an neue Sprite-Größe anpassen (falls sich geändert)
+        # und Position beibehalten
+        self.rect = self.image.get_rect(center=old_center)
     
     def _update_powerup_timers(self):
         """Verwaltet alle PowerUp-Timer (minimale Timer-Logik, PowerUps setzen die Werte)"""
