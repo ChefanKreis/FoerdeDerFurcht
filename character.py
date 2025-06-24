@@ -17,13 +17,21 @@ class Character(pygame.sprite.Sprite):
         self.level_width = WIDTH  # Standard-Wert, wird überschrieben
         self.level_height = HEIGHT
 
+        #Betäubung durch Syntax Scream
+        self.is_stunned = False
+        self.stun_timer = 0
+        self.stun_effect_color = (255, 0, 0, 70)  # Rot mit Transparenz
+
+
     def move(self, dx, dy):
-        self.rect.x += dx
-        self.rect.y += dy
+
+        if not self.is_stunned:
+            self.rect.x += dx
+            self.rect.y += dy
 
     def jump(self):
         # Nur springen, wenn der Charakter auf dem Boden ist
-        if self.on_ground:
+        if self.on_ground and not self.is_stunned:
             self.velocity.y = PLAYER_JUMP_STRENGTH  # Sprunggeschwindigkeit
             self.on_ground = False
 
@@ -31,6 +39,13 @@ class Character(pygame.sprite.Sprite):
         # Schwerkraft anwenden
         self.velocity.y += GRAVITY
         
+        #Betäubungseffekt anwenden
+        if self.is_stunned:
+            self.velocity.x = 0  # Keine horizontale Bewegung während der Betäubung
+            self.stun_timer -= 1
+            if self.stun_timer <= 0:
+                self.is_stunned = False
+
         # Maximale Fallgeschwindigkeit begrenzen
         if self.velocity.y > MAX_FALL_SPEED:
             self.velocity.y = MAX_FALL_SPEED
@@ -76,4 +91,11 @@ class Character(pygame.sprite.Sprite):
         elif self.rect.bottom > self.level_height:
             self.rect.bottom = self.level_height
             self.velocity.y = 0
-            self.on_ground = True 
+            self.on_ground = True
+
+    def apply_stun(self, duration):
+        """Wendet eine Betäubung an, die die Bewegung des Charakters für eine bestimmte Zeit stoppt."""
+        self.is_stunned = True
+        self.stun_timer = duration
+        self.velocity.x = 0
+        self.velocity.y = 0

@@ -43,7 +43,8 @@ class Projectile(pygame.sprite.Sprite):
     def __init__(self, x, y, sprite):
         super().__init__()
         self.image = sprite or pygame.Surface((10, 10))
-        self.image.fill(COLOR_BLUE)
+        if sprite is None:
+            self.image.fill(COLOR_BLUE)
         self.rect = self.image.get_rect(center=(x, y))
         self.velocity = pygame.math.Vector2(0, -5)
 
@@ -203,3 +204,36 @@ class Bubble(Projectile):
             # Für jetzt wird der Gegner einfach "besiegt"
             self.captured_enemy.kill()
             self.captured_enemy = None 
+
+class RedPen(Projectile):
+    def __init__(self, x, y, target_player):
+        #Lade das Sprite (oder erstelle ein Fallback-Rechteck)
+        sprite = None
+        try:
+            sprite = pygame.image.load("images/red_pen.png").convert_alpha()
+            sprite = pygame.transform.scale(sprite, (30, 15))
+        except (pygame.error, FileNotFoundError):
+            print("Fehler: 'red_pen.png' konnte nicht geladen werden. Nutze Fallback.")
+            sprite = pygame.Surface((15, 5))
+            sprite.fill((255, 50, 50))
+
+        super().__init__(x, y, sprite)
+
+        #Berechne die Geschwindigkeit und speichere sie in dieser Instanz
+        direction = pygame.math.Vector2(target_player.rect.centerx - self.rect.centerx,
+                                        target_player.rect.centery - self.rect.centery)
+        if direction.length() > 0:
+            direction.normalize_ip()
+
+        speed = 8
+        self.velocity = direction * speed # Speichere den Geschwindigkeitsvektor
+
+    def update(self, camera=None):
+        #Update Methode bewegt Projektil
+        self.rect.move_ip(self.velocity)
+
+        #Lösche das Projektil, wenn es weit außerhalb des Bildschirms ist
+        if camera and not camera.camera_rect.colliderect(self.rect):
+            if self.rect.bottom < 0 or self.rect.top > camera.level_height or \
+               self.rect.right < 0 or self.rect.left > camera.level_width:
+                self.kill()

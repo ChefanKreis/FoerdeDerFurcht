@@ -32,7 +32,17 @@ SEMESTERBREAK_DURATION = 300     # 5 Sekunden
 
 # Enemy-Einstellungen
 ENEMY_SPEED = 1                    # Standard-Geschwindigkeit der Gegner
-ENEMY_HEALTH = 100                 # Standard-Gesundheit
+ENEMY_HEALTH = 3                 # Standard-Gesundheit
+BOSS_HEALTH = 5                  # Gesundheit des Bosses
+BOSS_ATTACK_COOLDOWN = 1200             # Cooldown zwischen Boss-Angriffen (in Frames)
+BOSS_ATTACK_COOLDOWN_SYNTAXSCREAM = 3000*5
+BOSS_SHOOTING_RADIUS = 400
+PLAYER_SCREAM_DURATION = 2 * FPS  # Dauer des Player-Screams (in Frames, 2 Sekunden bei 60 FPS)
+BOSS_SCREAM_RADIUS = 100 #Boss Schrei bei Spieler Nähe
+ANZAHL_ENEMYS_MIN = 8
+ANZAHL_ENEMYS_MAX = 15
+ENEMY_SPAWN_AREA_MIN = 200
+
 
 # Farben (RGB-Werte)
 COLOR_WHITE = (255, 255, 255)

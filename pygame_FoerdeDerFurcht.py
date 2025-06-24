@@ -9,10 +9,11 @@ import sys      # Systemfunktionen
 
 # Importiere ausgelagerte Module
 from settings import (WIDTH, HEIGHT, FPS, USE_SCALED, COLOR_HEART, COLOR_BACKGROUND)
+from settings import ANZAHL_ENEMYS_MAX, ANZAHL_ENEMYS_MIN,ENEMY_SPAWN_AREA_MIN, BOSS_HEALTH
 from player import Player
 from enemies import MultipleChoiceEnemy, PythonEnemy, ProgrammingTaskEnemy, Boss
 from movement_enemies import MovementStrategy, HorizontalMovement, RandomJump, ChasePlayer
-from weapons import Weapon, Bubble
+from weapons import Weapon, Bubble, RedPen
 from platforms import Platform
 from powerups import *
 from camera import Camera
@@ -537,6 +538,43 @@ class Game:
             powerup_text = self.font.render(status, True, (255, 255, 0))
             self.screen.blit(powerup_text, (WIDTH - 250, 10 + i * 30))
 
+        # Boss Lebensanzeige erstellen und anzeigen
+        boss = None #testet ob es Boss gibt
+        for enemy in self.current_level.enemies:
+            if isinstance(enemy, Boss):
+                boss = enemy
+                break  # Schleife beenden, da es nur einen Boss gibt
+
+        
+        if boss:
+            # Einstellungen für die Lebensleiste
+            bar_width = 250
+            bar_height = 15
+            bar_x = (WIDTH - bar_width) // 2  # Zentriert am oberen Rand
+            bar_y = 20
+
+            # Berechne den prozentualen Anteil der verbleibenden Lebenspunkte
+            health_percentage = boss.health / BOSS_HEALTH
+            current_health_width = bar_width * health_percentage
+
+            # Hintergrund der Lebensleiste (dunkelrot)
+            background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+            pygame.draw.rect(self.screen, (139, 0, 0), background_rect)
+
+            # Vordergrund der Lebensleiste (hellrot)
+            # schrumpfende Gesundheit
+            if current_health_width > 0:
+                health_rect = pygame.Rect(bar_x, bar_y, current_health_width, bar_height)
+                pygame.draw.rect(self.screen, (255, 69, 0), health_rect)
+
+            # Schwarzer Rahmen
+            pygame.draw.rect(self.screen, (0, 0, 0), background_rect, 3)
+
+            # Name des Bosses über der Leiste anzeigen
+            boss_name_text = self.font.render("Prof. Dr. Krauss", True, (255, 255, 255))
+            text_rect = boss_name_text.get_rect(center=(WIDTH // 2, bar_y + bar_height + 15))
+            self.screen.blit(boss_name_text, text_rect)
+
     def draw_heart(self, x, y, size):
         # Einfaches Herz mit pygame.draw zeichnen
         # Herz aus zwei Kreisen und einem Dreieck
@@ -701,7 +739,10 @@ class Level:
                 image_path = f"images/{filename}"
                 try:
                     sprite = pygame.image.load(image_path).convert_alpha()
-                    sprite = pygame.transform.scale(sprite, (50, 50))  # Gegner-Größe
+                    if sprite_key == 'boss':
+                            pass
+                    else:
+                        sprite = pygame.transform.scale(sprite, (50, 50))  # Gegner-Größe
                     print(f"{sprite_key.capitalize()}-Sprite geladen: {image_path}")
                     break
                 except (pygame.error, FileNotFoundError):
@@ -740,35 +781,47 @@ class Level:
         
         for x, y, width, height in platform_data:
             self.platforms.add(Platform(x, y, width, height))
-        
-        # Gegner über das Level verteilt
-        enemy_positions = [
-            (300, HEIGHT - 100),
-            (600, HEIGHT - 300),
-            (1000, HEIGHT - 350),
-            (1300, HEIGHT - 100),
-            (1700, HEIGHT - 250),
-            (2000, HEIGHT - 100),
-            (2200, HEIGHT - 300),
+
+        # Enemies Random spawnen lassen
+
+        ENEMY_SPAWN_AREA_MAX = self.level_width - 500
+
+        spawnable_surfaces=list(self.platforms) #nur auf Plattformen
+
+        num_enemies_spawn = random.randint(ANZAHL_ENEMYS_MIN,ANZAHL_ENEMYS_MAX) #Zahl dazwischen
+        enemy_types =[
+              ('multiple_choice', MultipleChoiceEnemy),
+            ('python', PythonEnemy),
+            ('programming_task', ProgrammingTaskEnemy)
         ]
-        
-        for i, (x, y) in enumerate(enemy_positions):
-            if i % 3 == 0:
-                enemy = MultipleChoiceEnemy(x, y, self.enemy_sprites['multiple_choice'], self.level_width) # Pass level_width
-            elif i % 3 == 1:
-                enemy = PythonEnemy(x, y, self.enemy_sprites['python'], self.level_width) # Pass level_width
-            else:
-                enemy = ProgrammingTaskEnemy(x, y, self.enemy_sprites['programming_task'], self.level_width) # Pass level_width
+        for _ in range(num_enemies_spawn):
+            # Wähle eine zufällige Oberfläche zum Spawnen
+            spawn_surface = random.choice(spawnable_surfaces)
             
+            # Berechne eine zufällige X-Position auf dieser Oberfläche
+            # Begrenze den Bereich, um Überhänge zu vermeiden
+            spawn_x = random.randint(
+                int(spawn_surface.rect.left), 
+                int(spawn_surface.rect.right - 50) # 50 ist die Gegnerbreite
+            )
+
+            # Spawn nur im definierten Spielbereich
+            if not (ENEMY_SPAWN_AREA_MIN < spawn_x < ENEMY_SPAWN_AREA_MAX):
+                continue # Wenn nicht im Spiel nochmal probieren
+
+            spawn_y = spawn_surface.rect.top - 51 # 51 nicht in Plattform
+
+            enemy_key, enemy_class = random.choice(enemy_types) #Gegnerauswahl
+            
+            enemy = enemy_class(spawn_x, spawn_y, self.enemy_sprites[enemy_key], self.level_width) #einfügen
             self.enemies.add(enemy)
-                
-        ######## Boss am Ende hinzufügen ########
-        boss_x = self.level_width - 300  # Boss am rechten Ende des Levels
+
+        # Boss am Ende hinzufügen 
+        boss_x = self.level_width - 450  # Boss am rechten Ende des Levels
         boss_y = HEIGHT - 200  # Etwas höher als der Boden
-        boss = Boss(boss_x, boss_y, self.enemy_sprites['boss'], self.level_width)  # Pass level_width
+        boss = Boss(boss_x, boss_y, self.enemy_sprites['boss'], self.level_width)  # übergib level_width
         self.enemies.add(boss)
-            
-            #self.enemies.add(enemy)
+        boss.projectiles = self.projectiles   
         
         # PowerUps und Collectibles über das Level verteilt
         self._spawn_level_items()
@@ -780,21 +833,23 @@ class Level:
         self.camera.update(self.player)  # Oder: self.camera.update_with_deadzone(self.player)
         
         for enemy in self.enemies:
-            enemy.update(self.platforms, self.player, self.camera) # Spieler, Kamera übergeben
-            
-        
-        # Gegner-Updates (mit Einfrieren-Check)
-        for enemy in self.enemies:
-            if hasattr(enemy, 'update') and callable(enemy.update):
-                # Gegner nur aktualisieren wenn sie nicht eingefroren sind
-                if not self.player.are_enemies_frozen():
-                    enemy.update(self.platforms)
-                else:
-                    # Gefrorene Gegner: Nur Schwerkraft, keine Bewegung
-                    enemy.velocity.x = 0  # Horizontale Bewegung stoppen
-                    enemy.rect.y += enemy.velocity.y  # Schwerkraft weiter anwenden
-                    enemy.velocity.y += 0.8  # Gravity
+            if isinstance(enemy, Boss):
+                enemy.perform_boss_attack(self.player) #Übergabe Projektile
 
+            if not self.player.are_enemies_frozen():
+                enemy.update(self.platforms, self.player, self.camera)
+
+            else:
+                # Update wenn eingefrorene Gegner 
+                enemy.velocity.x = 0  # Horizontale Bewegung stoppen
+                enemy.update(self.platforms) # Wende Schwerkraft und Kollision an
+            
+            # Kollision Spieler mit diesem Gegner prüfen
+            if self.player.rect.colliderect(enemy.rect):
+                if not self.player.is_invincible:
+                    self.player.take_damage()          
+         
+            
             # Kollision Spieler mit diesem Gegner prüfen
             if self.player.rect.colliderect(enemy.rect):
                 if not self.player.is_invincible:
@@ -817,11 +872,25 @@ class Level:
                 if not projectile.captured_enemy and not projectile.is_popping:
                     for enemy in self.enemies:
                         if projectile.rect.colliderect(enemy.rect):
-                            projectile.capture_enemy(enemy)
-                            # Credit Points spawnen wenn Gegner gefangen wird
-                            self._spawn_creditpoint(enemy.rect.centerx, enemy.rect.centery)
+                            if isinstance(enemy, Boss):
+                                enemy.take_damage()
+                                projectile.is_popping = True
+                            else:
+
+                                projectile.capture_enemy(enemy)
+                                # Credit Points spawnen wenn Gegner gefangen wird
+                                self._spawn_creditpoint(enemy.rect.centerx, enemy.rect.centery)
                             break
+        #Kollisionserkennung Spieler Boss RedPen
+        projectiles_hitting_player = pygame.sprite.spritecollide(self.player, self.projectiles, False)
         
+        if projectiles_hitting_player:
+            for projectile in projectiles_hitting_player:
+                if isinstance(projectile, RedPen):
+                    self.player.take_damage()
+                    projectile.kill()
+                    break
+
         # Sammel-Kollisionen
         self._handle_collection_collisions()
     
@@ -1006,6 +1075,14 @@ class Level:
                 screen.blit(self.player.image, player_pos)
         else:
             screen.blit(self.player.image, player_pos)
+
+        #Betäubung
+        if self.player.is_stunned:
+            stun_overlay = pygame.Surface(self.player.rect.size, pygame.SRCALPHA)
+
+            stun_overlay.fill((255,0,0,80))
+            screen.blit(stun_overlay, player_pos)
+
     
     def _draw_player_outline(self, screen, player_pos, colors):
         """Zeichnet eine leuchtende Umrandung um den Player"""
