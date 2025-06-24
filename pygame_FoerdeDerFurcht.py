@@ -14,7 +14,7 @@ from player import Player
 from enemies import MultipleChoiceEnemy, PythonEnemy, ProgrammingTaskEnemy, Boss
 from movement_enemies import MovementStrategy, HorizontalMovement, RandomJump, ChasePlayer
 from weapons import Weapon, Bubble, RedPen
-from platforms import Platform
+from platforms import Platform, BreakingPlatform
 from powerups import *
 from camera import Camera
 
@@ -75,6 +75,7 @@ class Game:
         self.current_level = Level(1)
         self.score = 0
         self.game_over = False
+        self.level_complete = False    # Level-Sieg-Zustand
         self.show_start_screen = True  # Startbildschirm anzeigen
         self.show_main_menu = True     # Hauptmenü anzeigen
         self.show_options = False      # Optionsmenü anzeigen
@@ -426,6 +427,15 @@ class Game:
                     # Bei Game Over: Neustart mit 'R' Taste
                     if event.key == pygame.K_r:
                         self.restart_game()
+                elif self.level_complete:
+                    # Bei Level Complete: Neustart mit 'R' oder Hauptmenü mit 'ESC'
+                    if event.key == pygame.K_r:
+                        self.restart_game()
+                    elif event.key == pygame.K_ESCAPE:
+                        self.show_start_screen = True
+                        self.show_main_menu = True
+                        self.level_complete = False
+                        self.menu_animation_offset = 200  # Animation zurücksetzen
                 else:
                     # Normale Spielsteuerung
                     player_speed = self.current_level.player.get_movement_speed()
@@ -462,20 +472,26 @@ class Game:
                         self.show_main_menu = True
                         self.menu_animation_offset = 200  # Animation zurücksetzen
             if event.type == pygame.KEYUP:
-                if not self.game_over and not self.show_start_screen:
+                if not self.game_over and not self.show_start_screen and not self.level_complete:
                     if event.key == pygame.K_LEFT and self.current_level.player.velocity.x < 0:
                         self.current_level.player.velocity.x = 0
                     if event.key == pygame.K_RIGHT and self.current_level.player.velocity.x > 0:
                         self.current_level.player.velocity.x = 0
 
     def update(self):
-        if not self.game_over and not self.show_start_screen:
+        if not self.game_over and not self.show_start_screen and not self.level_complete:
             self.current_level.update()
             # Score vom Spieler übernehmen
             self.score = self.current_level.player.score
             # Prüfen ob Spieler alle Leben verloren hat
             if self.current_level.player.lives <= 0:
                 self.game_over = True
+            
+            # Prüfen ob Boss besiegt wurde
+            boss_defeated = self._check_boss_defeated()
+            if boss_defeated:
+                self.level_complete = True
+                print("Level abgeschlossen! Boss besiegt!")
 
     def draw(self):
         self.screen.fill((0, 0, 0))  # Hintergrund
@@ -491,6 +507,9 @@ class Game:
                 self.draw_options_menu(self.screen, mouse_pos)
             else:
                 self.draw_start_screen()
+        elif self.level_complete:
+            # Level abgeschlossen - Siegesbildschirm anzeigen
+            self.draw_level_complete()
         elif not self.game_over:
             self.current_level.draw(self.screen)
             self.draw_hud()
@@ -633,9 +652,103 @@ class Game:
         final_score_rect = final_score_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 100))
         self.screen.blit(final_score_text, final_score_rect)
 
+    def _check_boss_defeated(self):
+        """Prüft ob der Boss besiegt wurde (nicht mehr in der enemies-Gruppe)"""
+        # Prüfe ob mindestens ein Boss im Level existiert hat
+        if not hasattr(self.current_level, '_boss_spawned'):
+            # Prüfe ob ein Boss im Level vorhanden war
+            for enemy in self.current_level.enemies:
+                if isinstance(enemy, Boss):
+                    self.current_level._boss_spawned = True
+                    break
+            else:
+                # Kein Boss im Level gefunden
+                return False
+        
+        # Prüfe ob Boss noch vorhanden ist
+        for enemy in self.current_level.enemies:
+            if isinstance(enemy, Boss):
+                return False  # Boss noch vorhanden
+        
+        # Boss wurde gespawnt aber ist nicht mehr da = besiegt
+        return hasattr(self.current_level, '_boss_spawned') and self.current_level._boss_spawned
+    
+    def draw_level_complete(self):
+        """Zeichnet den Level-Complete-Bildschirm"""
+        # Hintergrund abdunkeln
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(150)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+        
+        # Goldener Hintergrund für den Siegestext
+        victory_panel_width = 600
+        victory_panel_height = 400
+        panel_x = (WIDTH - victory_panel_width) // 2
+        panel_y = (HEIGHT - victory_panel_height) // 2
+        
+        # Panel mit Gradient-Effekt
+        panel_surface = pygame.Surface((victory_panel_width, victory_panel_height))
+        panel_surface.fill((40, 40, 50))  # Dunkler Hintergrund
+        
+        # Goldener Rahmen
+        pygame.draw.rect(panel_surface, (255, 215, 0), 
+                        (0, 0, victory_panel_width, victory_panel_height), 5)
+        
+        # Innerer Glow-Effekt
+        inner_rect = pygame.Rect(5, 5, victory_panel_width - 10, victory_panel_height - 10)
+        pygame.draw.rect(panel_surface, (60, 60, 70), inner_rect, 2)
+        
+        self.screen.blit(panel_surface, (panel_x, panel_y))
+        
+        # Siegestext
+        victory_title = self.big_font.render("PROFESSOR BESIEGT!", True, (255, 215, 0))
+        title_rect = victory_title.get_rect(center=(WIDTH//2, panel_y + 70))
+        self.screen.blit(victory_title, title_rect)
+        
+        # Untertitel
+        subtitle = self.title_font.render("Klausur erfolgreich bestanden!", True, (0, 255, 0))
+        subtitle_rect = subtitle.get_rect(center=(WIDTH//2, panel_y + 120))
+        self.screen.blit(subtitle, subtitle_rect)
+        
+        # Score-Informationen
+        final_score = self.title_font.render(f"Endpunktestand: {self.score}", True, (255, 255, 255))
+        score_rect = final_score.get_rect(center=(WIDTH//2, panel_y + 170))
+        self.screen.blit(final_score, score_rect)
+        
+        # Credit Points
+        final_cp = self.font.render(f"Credit Points gesammelt: {self.current_level.player.credit_points}", True, (255, 215, 0))
+        cp_rect = final_cp.get_rect(center=(WIDTH//2, panel_y + 210))
+        self.screen.blit(final_cp, cp_rect)
+        
+        # Grades
+        final_grades = self.font.render(f"Noten 1,0 gesammelt: {self.current_level.player.grades_collected}", True, (0, 255, 0))
+        grades_rect = final_grades.get_rect(center=(WIDTH//2, panel_y + 240))
+        self.screen.blit(final_grades, grades_rect)
+        
+        # Überlebte Leben
+        final_lives = self.font.render(f"Verbleibende Leben: {self.current_level.player.lives}", True, (255, 100, 100))
+        lives_rect = final_lives.get_rect(center=(WIDTH//2, panel_y + 270))
+        self.screen.blit(final_lives, lives_rect)
+        
+        # Trennlinie
+        line_y = panel_y + 300
+        pygame.draw.line(self.screen, (255, 215, 0), 
+                        (panel_x + 50, line_y), (panel_x + victory_panel_width - 50, line_y), 2)
+        
+        # Anweisungen
+        instruction1 = self.font.render("Drücke 'R' für Neustart", True, (255, 255, 255))
+        instruction1_rect = instruction1.get_rect(center=(WIDTH//2, panel_y + 330))
+        self.screen.blit(instruction1, instruction1_rect)
+        
+        instruction2 = self.font.render("Drücke 'ESC' für Hauptmenü", True, (255, 255, 255))
+        instruction2_rect = instruction2.get_rect(center=(WIDTH//2, panel_y + 360))
+        self.screen.blit(instruction2, instruction2_rect)
+
     def restart_game(self):
         # Spiel zurücksetzen
         self.game_over = False
+        self.level_complete = False
         self.score = 0
         self.current_level = Level(1)
         self.show_start_screen = True  # Zurück zum Hauptmenü
@@ -916,6 +1029,58 @@ class Level:
             for x, y, width, height in platforms:
                 self.platforms.add(Platform(x, y, width, height))
         
+        # BRECHENDE PLATTFORMEN - strategisch ausgewählte Plattformen ersetzen
+        breaking_platform_positions = [
+            # Zone 1-2: Lerneffekt - ein paar brechende für Tutorial
+            (550, HEIGHT - 200, 150, 20),     # Tutorial: Zweite Plattform
+            (1200, HEIGHT - 120, 200, 20),    # Tutorial: Fünfte Plattform
+            
+            # Zone 3-4: Mittlerer Schwierigkeitsgrad
+            (WIDTH*2 + 370, HEIGHT - 260, 100, 20),   # Mittlere Zone: Zweite Plattform
+            (WIDTH*2 + 680, HEIGHT - 300, 80, 20),    # Mittlere Zone: Vierte Plattform
+            (WIDTH*3 + 180, HEIGHT - 200, 100, 20),   # Mittlere Zone: Siebte Plattform
+            
+            # Zone 5-6: Schwieriger - mehr strategische Positionen
+            (WIDTH*4 + 310, HEIGHT - 300, 60, 20),    # Schwer: Zweite Plattform
+            (WIDTH*4 + 600, HEIGHT - 340, 60, 20),    # Schwer: Höchste Plattform (riskant!)
+            (WIDTH*5 + 210, HEIGHT - 200, 70, 20),    # Schwer: Achte Plattform
+            (WIDTH*5 + 490, HEIGHT - 240, 80, 20),    # Schwer: Zehnte Plattform
+            
+            # Zone 7-8: Sehr schwer - kritische Positionen
+            (WIDTH*6 + 350, HEIGHT - 300, 60, 20),    # Sehr schwer: Zweite Plattform
+            (WIDTH*6 + 610, HEIGHT - 340, 50, 20),    # Sehr schwer: Höchste Plattform
+            (WIDTH*7 + 140, HEIGHT - 240, 60, 20),    # Sehr schwer: Achte Plattform
+            
+            # Zone 9-10: Expert - nur wenige, aber entscheidende
+            (WIDTH*8 + 270, HEIGHT - 320, 50, 20),    # Expert: Zweite Plattform
+            (WIDTH*8 + 510, HEIGHT - 340, 40, 20),    # Expert: Höchste Plattform
+            (WIDTH*9 + 150, HEIGHT - 340, 40, 20),    # Expert: Sehr hohe Plattform
+            
+            # Zone 11-12: Nightmare - tückische Positionen
+            (WIDTH*10 + 210, HEIGHT - 320, 40, 20),   # Nightmare: Zweite Plattform
+            (WIDTH*10 + 410, HEIGHT - 360, 30, 20),   # Nightmare: Extrem hohe Plattform
+            (WIDTH*11 + 270, HEIGHT - 340, 30, 20),   # Nightmare: Sehr hohe Plattform
+            
+            # Zone 13-14: Extreme - finale Herausforderung
+            (WIDTH*12 + 180, HEIGHT - 340, 30, 20),   # Extreme: Extrem hohe Plattform
+            (WIDTH*12 + 650, HEIGHT - 360, 25, 20),   # Extreme: Höchste Plattform
+            (WIDTH*13 + 140, HEIGHT - 340, 25, 20),   # Extreme: Finale Herausforderung
+        ]
+        
+        # Entferne die entsprechenden normalen Plattformen und ersetze sie durch brechende
+        for x, y, width, height in breaking_platform_positions:
+            # Finde und entferne die normale Plattform an dieser Position
+            for platform in list(self.platforms):
+                if (platform.rect.x == x and platform.rect.y == y and 
+                    platform.rect.width == width and platform.rect.height == height):
+                    self.platforms.remove(platform)
+                    break
+            
+            # Füge die brechende Plattform hinzu
+            breaking_platform = BreakingPlatform(x, y, width, height)
+            self.platforms.add(breaking_platform)
+            print(f"Brechende Plattform hinzugefügt bei ({x}, {y}) - {width}x{height}")
+        
         # GEGNER-PLATZIERUNG (progressiv schwieriger)
         # Zone 1-2: Wenige, einfache Gegner
         easy_enemies = [
@@ -1052,7 +1217,15 @@ class Level:
         
         self.powerups.update()
         self.collectibles.update()
-        self.platforms.update()
+        
+        # Plattformen updaten (brechende Plattformen brauchen Player-Referenz)
+        for platform in self.platforms:
+            if hasattr(platform, 'update') and hasattr(platform, 'check_player_collision'):
+                # Brechende Plattform - braucht Player-Info
+                platform.update(self.player)
+            elif hasattr(platform, 'update'):
+                # Normale Plattform
+                platform.update()
         
         # Jedes Projektil mit Kamera-Referenz updaten
         for projectile in self.projectiles:
@@ -1362,9 +1535,15 @@ class Level:
                     screen.blit(self.background_texture, (bg_x, 0))
         
         # Alle Sprites mit Kamera-Offset zeichnen
-        # Plattformen
+        # Plattformen (mit Shake-Effekt für brechende Plattformen)
         for platform in self.platforms:
-            screen.blit(platform.image, self.camera.apply(platform))
+            if hasattr(platform, 'get_render_rect'):
+                # Brechende Plattform mit Shake-Effekt
+                render_rect = platform.get_render_rect()
+                screen.blit(platform.image, self.camera.apply_rect(render_rect))
+            else:
+                # Normale Plattform
+                screen.blit(platform.image, self.camera.apply(platform))
         
         # Collectibles
         for collectible in self.collectibles:

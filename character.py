@@ -58,7 +58,12 @@ class Character(pygame.sprite.Sprite):
         # Horizontale Kollisionsprüfung mit Plattformen
         if platforms:
             for platform in platforms:
-                if self.rect.colliderect(platform.rect):
+                # Prüfe ob brechende Plattform kollidierbar ist
+                can_collide = True
+                if hasattr(platform, 'can_collide'):
+                    can_collide = platform.can_collide()
+                
+                if can_collide and self.rect.colliderect(platform.rect):
                     if self.velocity.x > 0:  # Bewegung nach rechts
                         self.rect.right = platform.rect.left
                     elif self.velocity.x < 0:  # Bewegung nach links
@@ -77,7 +82,12 @@ class Character(pygame.sprite.Sprite):
         self.on_ground = False
         if platforms:
             for platform in platforms:
-                if self.rect.colliderect(platform.rect):
+                # Prüfe ob brechende Plattform kollidierbar ist
+                can_collide = True
+                if hasattr(platform, 'can_collide'):
+                    can_collide = platform.can_collide()
+                
+                if can_collide and self.rect.colliderect(platform.rect):
                     if self.velocity.y > 0:  # Charakter fällt nach unten
                         self.rect.bottom = platform.rect.top
                         self.velocity.y = 0
